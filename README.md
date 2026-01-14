@@ -33,7 +33,7 @@ We’re open to a **two-phase structure**:
 - 50% upon public release on a hardened VRP core
 
 **Valuation:** ~€500M  
-📧 jumpingvpn@protonmail.com  
+📧 jumpingvpn@yahoo.com  
 Subject: `Operator Acquisition`
 
 Upon acquisition, the VPN will be finalized and released publicly,  
