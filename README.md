@@ -56,3 +56,22 @@ More logs coming soon.
 
 This repository does not contain the full implementation of Jumping VPN or VRP.  
 It is a **preview of architectural intent**, not a product release.
+
+---
+
+Jumping VPN is not free.  
+It’s not SaaS either.  
+ 
+You pay 19.99€ once — and you get the program.  
+
+That includes 7 days of full access.  
+After that, you choose:  
+  
+Stay in Free Mode (1 route, limited features)  
+Or activate a plan (1/3/12/24 months)  
+  
+The protocol stays.  
+The VPN is yours.  
+> The drift continues.
+
+---
