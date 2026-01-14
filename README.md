@@ -73,5 +73,3 @@ Or activate a plan (1/3/12/24 months)
 The protocol stays.  
 The VPN is yours.  
 > The drift continues.
-
----
