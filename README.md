@@ -128,12 +128,15 @@ If you follow the node, you follow the movement.
 
 Official Channels
 • TikTok (Kinetic Visualizations)
+
 https://www.tiktok.com/@jumpingvpn?_r=1&_t=ZN-93bm4vdS4u6](https://tiktok.com/@jumpingvpn
 
 • → LinkedIn Node
+
 https://www.linkedin.com/in/vitalijus-riabovas-43b022259
 
 • Telegram (Signals & Mutation Logs)
+
 https://t.me/JumpingVPN
 
 As I move into Milestone 2, I'm open to discussing strategic partnerships with infrastructure providers and security firms who want to be at the forefront of Kinetic Defense.
