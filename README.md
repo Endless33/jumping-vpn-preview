@@ -74,7 +74,6 @@ The protocol stays.
 The VPN is yours.  
 The drift continues.
 
-
 ---
 
 ✉️ Join the Operators If you feel the pulse:
@@ -91,9 +90,7 @@ BTC: bc1qafvdlevfeld4zvmqhvalwqdcc7jag2xanecfwx
 ETH: 0x3b51AaF84F958e082b90639bd7728544234Ff7c9
 LTC: ltc1qden05pz46cwtk022y9cqhzzfkj2ssgq42ldmys
 
-
 ---
-
 
 📦 Repository Structure
 
@@ -123,9 +120,7 @@ guardian observation
 client heartbeat
 No real routing or cryptography is exposed.
 
-
 ---
-
 
 🛰 External Observation Node Live protocol signals, mutation announcements, and operator‑level insights appear here:
 
@@ -145,8 +140,3 @@ As I move into Milestone 2, I'm open to discussing strategic partnerships with i
 
 Kinetic VPN / MTD protocol.
 Support the node to accelerate new behaviors.
-
----
-
-
-
