@@ -1,144 +1,244 @@
 # 🧬 Jumping VPN — Architectural Preview
 
-Jumping VPN is a **session-centric VPN architecture** designed for **transport volatility**.
+Jumping VPN is a **session-centric VPN architecture** designed for environments where transport volatility is the norm.
 
-Traditional VPNs assume stable paths and often treat instability as failure.
-Jumping VPN treats instability as an expected state — modeled explicitly in the session lifecycle.
+Traditional VPNs assume stable paths and treat instability as failure.  
+Jumping VPN models instability as an expected state within a bounded, deterministic lifecycle.
 
-This repository is a **public architectural preview**: documentation, mutation logs, and protocol fragments.
+This repository is a **public architectural preview** of the system’s behavioral model, documentation, and conceptual validation artifacts.
+
 It is not a production release.
 
 ---
 
 ## 🔎 Core Thesis
 
-Most VPNs bind identity and continuity to a transport.
+Most VPNs bind identity and continuity directly to transport.
 
-Reality:
-- paths fail
-- packet loss spikes
-- mobile networks flap
-- NAT mappings expire
-- cross-border routes degrade
+In reality:
 
-Jumping VPN flips the model:
+- paths fail  
+- packet loss spikes  
+- mobile networks flap  
+- NAT mappings expire  
+- cross-border routes degrade  
+
+Jumping VPN separates concerns:
 
 - **Session is the source of truth**
 - **Transports are replaceable**
-- **Volatility is modeled, not treated as failure**
+- **Volatility is modeled explicitly**
+- **Failure boundaries are deterministic**
 
 ---
 
-## 🧠 Architectural Principles
+## 🧠 Architectural Model
 
-### 1) Session-Centric Design
-A session exists independently of any specific transport path.
+### Session-Centric Design
+
+A session exists independently of any single transport path.  
 Transport switching does **not** imply identity renegotiation.
 
-### 2) Deterministic Recovery
+### Deterministic Recovery
+
 Transport failover is:
-- explicit
-- bounded
-- logged
-- auditable
+
+- explicit  
+- bounded  
+- rate-limited  
+- logged  
+- auditable  
 
 No silent renegotiation.  
 No uncontrolled session resets.
 
-### 3) Volatility as a First-Class State
-Transport degradation is represented as a modeled state:
+### Volatility as a State
 
+Transport degradation is represented formally:
+
+- `BIRTH`
 - `ATTACHED`
 - `VOLATILE`
 - `DEGRADED`
 - `RECOVERING`
+- `TERMINATED`
 
-Switch decisions are intentional and traceable.
+State transitions are defined, bounded, and reason-coded.
 
-### 4) Operator-Grade Observability
-Every critical transition can be inspected.
-Adaptation is explainable — not heuristic guesswork.
+### Operator-Grade Observability
+
+All critical transitions emit structured events.
+
+Adaptation is explainable.  
+Behavior is auditable.  
+Failure is deterministic.
 
 ---
 
 ## 📂 Repository Structure
 
-. ├── docs/ │   ├── MutationLogs/ │   ├── architecture.md │   ├── onepager.md │   ├── faq.md │   ├── threat-model.md │   ├── state-machine.md │   ├── design-decisions.md │   ├── limitations.md │   ├── security-review-plan.md │   ├── roadmap.md │   └── test-scenarios.md ├── spec/ │   └── vrp-preview.md └── poc/ ├── demo.py ├── session.py ├── transport.py ├── policy.py ├── logger.py └── README.md
+```
+.
+├── docs/
+│   ├── MutationLogs/
+│   ├── architecture.md
+│   ├── onepager.md
+│   ├── faq.md
+│   ├── threat-model.md
+│   ├── state-machine.md
+│   ├── design-decisions.md
+│   ├── limitations.md
+│   ├── security-review-plan.md
+│   ├── roadmap.md
+│   └── test-scenarios.md
+├── spec/
+│   └── vrp-preview.md
+└── poc/
+    ├── demo.py
+    ├── session.py
+    ├── transport.py
+    ├── policy.py
+    ├── logger.py
+    └── README.md
+```
 
 ---
 
 ## 🧬 Mutation Logs
 
-Mutation Logs document the architecture’s evolution.
+Mutation Logs document the architectural evolution of the system.
 
-Recommended starting points:
-- `MutationLog21.md` — *Drift Begins Where Routing Ends*
-- `MutationLog22.md` — *Why VRP Refuses to Stabilize*
+Suggested starting points:
 
-Each log describes intent, state modeling, and behavioral guarantees.
+- `MutationLog21.md` — Drift Begins Where Routing Ends  
+- `MutationLog22.md` — Why VRP Refuses to Stabilize  
+
+Each log describes design intent, state modeling, and behavioral guarantees.
 
 ---
 
-## 🛰 Protocol Layer: VRP (Veil Routing Protocol)
+## 🛰 Protocol Layer — VRP (Veil Routing Protocol)
 
-Jumping VPN is built on top of VRP — an experimental routing concept designed for drift-aware behavior rather than static topology assumptions.
+Jumping VPN is conceptually built on top of VRP — an experimental routing model designed for drift-aware behavior rather than static topology assumptions.
 
-This repository contains preview notes only.
+This repository contains preview documentation only.  
 The hardened implementation layer is not published here.
 
 ---
 
-## 🧪 Conceptual Demo (Legacy)
+## 🧪 Behavioral Proof of Concept
 
-A safe mock session lifecycle demo is available:
+A minimal PoC exists under `/poc/` to demonstrate the core architectural claim:
+
+> A session can survive transport death if an alternative transport is available.
+
+Run locally:
 
 ```bash
-cd docs/demo
-chmod +x mock-session.sh
-./mock-session.sh
-
-The demo simulates:
-session birth
-transport attachment
-volatility phase
-degradation handling
-deterministic recovery
-No real routing or cryptographic primitives are exposed.
-✅ Behavioral PoC (Session survives transport death)
-A minimal Proof of Concept exists under /poc/ to demonstrate the core claim: a session remains alive while a transport dies and a backup transport is available.
-Run (local environment):
-Bash
-Копировать код
 python -m poc.demo
+```
+
 Output:
-out/poc_run.jsonl (JSONL event log)
-Look for:
-TransportKilled
-TransportSwitch
-SessionStateChange
-⚠️ Status
-Jumping VPN is currently in architectural validation and staged development.
-This repository is:
-not a full implementation
-not a production release
-not a commercial distribution
-It is an architectural window into the system’s design philosophy.
-🎯 Who This Is For
+
+- `out/poc_run.jsonl` (structured JSONL log)
+
+Expected behavior:
+
+- `TransportKilled` event occurs  
+- `TransportSwitch` event occurs  
+- Session returns to `ATTACHED`  
+- No `TERMINATED` state while a viable backup transport exists  
+
+This PoC validates behavioral modeling, not production security guarantees.
+
+---
+
+## 🛡 Threat Model & Boundaries
+
+See:
+
+- `docs/threat-model.md`
+- `docs/state-machine.md`
+- `docs/design-decisions.md`
+- `docs/limitations.md`
+
+Jumping VPN explicitly defines:
+
+- adversary assumptions  
+- allowed/forbidden transitions  
+- bounded adaptation rules  
+- deterministic failure conditions  
+
+It does **not** claim:
+
+- endpoint compromise protection  
+- full anonymity guarantees  
+- censorship bypass capability  
+- production-grade cryptographic hardening (in this preview)
+
+---
+
+## 📈 Development Roadmap
+
+The roadmap outlines staged evolution:
+
+1. Architectural validation  
+2. Core session engine implementation  
+3. Volatility handling & observability  
+4. Security hardening & review  
+5. Controlled pilot deployment  
+
+See `docs/roadmap.md`.
+
+---
+
+## ⚠️ Status
+
+Jumping VPN is currently in **architectural validation phase**.
+
+This repository:
+
+- is not a full implementation  
+- is not production-ready  
+- is not commercially distributed  
+- does not expose hardened cryptographic logic  
+
+It represents behavioral modeling and staged architectural direction.
+
+---
+
+## 🎯 Intended Audience
+
 This project may be relevant to:
-infrastructure teams operating in volatile mobile environments
-fintech platforms experiencing session collapse during failover
-security architects designing deterministic recovery systems
-operators exploring transport abstraction and deterministic recovery
-🤝 Collaboration & Technical Discussions
+
+- infrastructure teams operating in volatile mobile environments  
+- fintech platforms experiencing session collapse during failover  
+- security architects designing deterministic recovery systems  
+- operators exploring transport abstraction models  
+
+---
+
+## 🤝 Technical Discussions
+
 Open to technical discussions with teams exploring:
-deterministic transport recovery
-session persistence under volatility
-transport abstraction models
-observability/audit requirements for adaptive systems
-📧 Contact: riabovasvitalijus@gmail.com
-📌 Disclaimer
-This repository does not contain full source code for Jumping VPN or VRP.
-It represents architectural direction, behavioral modeling concepts, and staged documentation of system evolution.
-Implementation details are released in controlled phases.
-Session remains the anchor.
-Transports come and go.
+
+- deterministic transport recovery  
+- session persistence under volatility  
+- bounded adaptation models  
+- observability for adaptive systems  
+
+📧 **Contact:** riabovasvitalijus@gmail.com
+
+---
+
+## Final Principle
+
+Transport instability is not an anomaly.
+
+It is the default state of modern networks.
+
+Jumping VPN treats volatility as modeled behavior —
+not as fatal error.
+
+**Session remains the anchor.  
+Transports come and go.**
