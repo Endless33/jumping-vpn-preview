@@ -96,3 +96,49 @@ A safe mock session lifecycle demo is available:
 cd docs/demo
 chmod +x mock-session.sh
 ./mock-session.sh
+
+The demo simulates:
+session birth
+transport attachment
+volatility phase
+degradation handling
+deterministic recovery
+No real routing or cryptographic primitives are exposed.
+✅ Behavioral PoC (Session survives transport death)
+A minimal Proof of Concept exists under /poc/ to demonstrate the core claim: a session remains alive while a transport dies and a backup transport is available.
+Run (local environment):
+Bash
+Копировать код
+python -m poc.demo
+Output:
+out/poc_run.jsonl (JSONL event log)
+Look for:
+TransportKilled
+TransportSwitch
+SessionStateChange
+⚠️ Status
+Jumping VPN is currently in architectural validation and staged development.
+This repository is:
+not a full implementation
+not a production release
+not a commercial distribution
+It is an architectural window into the system’s design philosophy.
+🎯 Who This Is For
+This project may be relevant to:
+infrastructure teams operating in volatile mobile environments
+fintech platforms experiencing session collapse during failover
+security architects designing deterministic recovery systems
+operators exploring transport abstraction and deterministic recovery
+🤝 Collaboration & Technical Discussions
+Open to technical discussions with teams exploring:
+deterministic transport recovery
+session persistence under volatility
+transport abstraction models
+observability/audit requirements for adaptive systems
+📧 Contact: riabovasvitalijus@gmail.com
+📌 Disclaimer
+This repository does not contain full source code for Jumping VPN or VRP.
+It represents architectural direction, behavioral modeling concepts, and staged documentation of system evolution.
+Implementation details are released in controlled phases.
+Session remains the anchor.
+Transports come and go.
