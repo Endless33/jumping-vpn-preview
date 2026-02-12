@@ -1,145 +1,177 @@
-# 🧬 Jumping VPN — Preview
+# 🧬 Jumping VPN — Architectural Preview
 
-**Jumping VPN** is a behavioral VPN built on top of **VRP** — a routing protocol designed for drift, not stability.
+Jumping VPN is a session-centric VPN architecture designed for transport volatility.
 
-This repository is a **public preview** of the architecture, mutation logs, and protocol fragments behind Jumping VPN.
+Unlike traditional VPNs that assume stable paths and renegotiate on failure,  
+Jumping VPN models transport instability as an expected state — not an exception.
 
----
-
-## 🔧 What’s Inside
-
-- `docs/MutationLogs/` — architectural logs (21–…)  
-- `spec/vrp-preview.md` — early protocol notes  
-- `README.md` — this file
+This repository is a public architectural preview of the concepts, mutation logs,
+and protocol fragments behind the system.
 
 ---
 
-## 🧠 What Makes Jumping VPN Different
+## 🔎 Core Thesis
 
-- **VRP (Veil Routing Protocol)** — routes based on behavior, not geography  
-- **Drift-native** — no fixed nodes, no static paths  
-- **Operator-grade** — designed for pressure, not convenience  
-- **Veil Identity** — packets don’t reveal origin or intent
+Most VPNs treat transport as stable.
+
+In reality:
+- paths fail
+- packet loss spikes
+- mobile networks flap
+- cross-border routes degrade
+
+Jumping VPN flips the model:
+
+> The session is the source of truth.  
+> Transports are replaceable.  
+> Volatility is modeled, not treated as failure.
 
 ---
 
-## 💰 Acquisition
+## 🧠 Architectural Principles
 
-Jumping VPN is available for acquisition.  
-The protocol (VRP) is not for sale — only the VPN built on top of it.
+### 1. Session-Centric Design
+The session exists independently of any specific transport path.  
+Transport switching does not imply identity renegotiation.
 
-We’re open to a **two-phase structure**:  
-- 50% upfront  
-- 50% upon public release on a hardened VRP core
+### 2. Deterministic Recovery
+Transport failover is:
+- explicit
+- bounded
+- logged
+- auditable
 
-**Valuation:** ~€500M  
-📧 jumpingvpn@yahoo.com  
-Subject: `Operator Acquisition`
+No silent renegotiation.  
+No uncontrolled session resets.
 
-Upon acquisition, the VPN will be finalized and released publicly,  
-built on a completed, hardened VRP core.
+### 3. Volatility as a First-Class State
+Transport degradation is represented as a modeled state:
+- ATTACHED
+- VOLATILE
+- DEGRADED
+- RECOVERING
+
+Switch decisions are intentional and traceable.
+
+### 4. Operator-Grade Observability
+Every transition can be inspected.  
+Adaptation is explainable — not heuristic guesswork.
+
+---
+
+## 📂 Repository Structure
+
+```
+jumping-vpn/
+├── docs/
+│   ├── MutationLogs/
+│   ├── architecture.md
+│   ├── onepager.md
+│   └── demo/
+├── spec/
+│   └── vrp-preview.md
+└── README.md
+```
 
 ---
 
 ## 🧬 Mutation Logs
 
-Start with:
+The Mutation Logs document the evolutionary steps of the architecture.
 
-- [`MutationLog21.md`](docs/MutationLogs/MutationLog21.md) — “Drift Begins Where Routing Ends”  
-- [`MutationLog22.md`](docs/MutationLogs/MutationLog22.md) — “Why VRP Refuses to Stabilize”
+Recommended starting points:
 
-More logs coming soon.
+- `MutationLog21.md` — Drift Begins Where Routing Ends  
+- `MutationLog22.md` — Why VRP Refuses to Stabilize  
 
----
-
-## ⚠️ Disclaimer
-
-This repository does not contain the full implementation of Jumping VPN or VRP.  
-It is a **preview of architectural intent**, not a product release.
+Each log describes architectural intent, state modeling, and behavioral guarantees.
 
 ---
 
-Jumping VPN is not free.  
-It’s not SaaS either.  
- 
-You pay 19.99€ once — and you get the program.  
+## 🛰 Protocol Layer: VRP (Veil Routing Protocol)
 
-That includes 7 days of full access.  
-After that, you choose:  
-  
-Stay in Free Mode (1 route, limited features)  
-Or activate a plan (1/3/12/24 months)  
-  
-The protocol stays.  
-The VPN is yours.  
-The drift continues.
+Jumping VPN is built on top of VRP — an experimental routing concept
+designed for drift-aware behavior rather than static topology assumptions.
+
+This repository contains preview notes only.  
+The hardened implementation layer is not published here.
 
 ---
 
-✉️ Join the Operators If you feel the pulse:
+## 🧪 Conceptual Demo
 
-📩 riabovasvitalijus@gmail.com
-📩 jumpingvpn@yahoo.com
+A safe mock session lifecycle demo is available:
 
-🛡 Support the Protocol
-Jumping VPN and VRP are self‑funded experimental projects. If you want to support the movement, you may contribute any amount via crypto.
+```
+cd docs/demo
+chmod +x mock-session.sh
+./mock-session.sh
+```
 
-Every satoshi strengthens the signal. Every ether fuels the evolution.
+The demo simulates:
 
-BTC: bc1qafvdlevfeld4zvmqhvalwqdcc7jag2xanecfwx
-ETH: 0x3b51AaF84F958e082b90639bd7728544234Ff7c9
-LTC: ltc1qden05pz46cwtk022y9cqhzzfkj2ssgq42ldmys
+- session birth
+- transport attachment
+- volatility phase
+- degradation handling
+- deterministic recovery
 
----
-
-📦 Repository Structure
-
-jumping-vpn/ ├── clients/        # platform-specific clients ├── docs/           # public documentation └── config/         # example configurations
-
-Example config:
-
-`yaml server: vpn.example.com port: 443 protocol: udp
-
-auth: type: token token: "your-token-here"
-
-routing: mode: "jumping" `
-
-🧭 Status Jumping VPN is in the preparation phase.
-Source code will be released in structured phases aligned with mutation cycles.
-
-This repository is a window — not the engine.
-
-🔹 Mock Session Demo A safe conceptual demo is available:
-
-cd docs/demo chmod +x mock-session.sh ./mock-session.sh
-
-Simulates:
-
-mutation cycles
-guardian observation
-client heartbeat
-No real routing or cryptography is exposed.
+No real routing or cryptographic primitives are exposed.
 
 ---
 
-🛰 External Observation Node Live protocol signals, mutation announcements, and operator‑level insights appear here:
+## ⚠️ Status
 
-If you follow the node, you follow the movement.
+Jumping VPN is currently in architectural validation and staged development.
 
-Official Channels
-• TikTok (Kinetic Visualizations)
+This repository is:
+- not a full implementation
+- not a production release
+- not a commercial distribution
 
-https://www.tiktok.com/@jumpingvpn?_r=1&_t=ZN-93bm4vdS4u6](https://tiktok.com/@jumpingvpn
+It is an architectural window into the system’s design philosophy.
 
-• → LinkedIn Node
+---
 
-https://www.linkedin.com/in/vitalijus-riabovas-43b022259
+## 🎯 Who This Is For
 
-• Telegram (Signals & Mutation Logs)
+This project may be relevant to:
 
-https://t.me/JumpingVPN
+- infrastructure teams operating in volatile mobile environments
+- fintech platforms experiencing session collapse during failover
+- security architects designing deterministic recovery systems
+- operators exploring next-generation transport abstraction models
 
-As I move into Milestone 2, I'm open to discussing strategic partnerships with infrastructure providers and security firms who want to be at the forefront of Kinetic Defense.
+---
 
-Kinetic VPN / MTD protocol.
-Support the node to accelerate new behaviors.
+## 🤝 Collaboration & Technical Discussions
+
+I am open to technical discussions with:
+
+- infrastructure providers
+- cybersecurity firms
+- mobile network operators
+- resilience-focused engineering teams
+
+If you are working on systems affected by transport instability
+and want to explore deterministic recovery models,
+feel free to reach out.
+
+📧 **Contact:**  
+riabovasvitalijus@gmail.com
+
+---
+
+## 📌 Disclaimer
+
+This repository does not contain full source code for Jumping VPN or VRP.
+
+It represents architectural direction, behavioral modeling concepts,
+and staged documentation of system evolution.
+
+Implementation details are released in controlled phases.
+
+---
+
+Session remains the anchor.  
+Transports come and go.
