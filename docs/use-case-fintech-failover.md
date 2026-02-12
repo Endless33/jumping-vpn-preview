@@ -85,3 +85,38 @@ Jumping VPN binds identity to session and treats transport as disposable.
 
 Session remains the anchor.
 Transports come and go.
+
+---
+
+## Real Transport Validation (UDP Prototype)
+
+The behavior described in this use case is partially validated by a minimal real UDP prototype:
+
+See:
+- `poc/real_udp_prototype.py`
+- `poc/README_udp.md`
+
+### What Is Demonstrated
+
+- A session is created once.
+- The client transport is deliberately killed (socket closed).
+- A new UDP transport is created (new source port).
+- The client reattaches using a session-bound proof.
+- The server emits an explicit `TransportSwitch`.
+- The session continues without reset or identity renegotiation.
+
+### Why This Matters
+
+In traditional systems, transport failure often triggers:
+- renegotiation
+- tunnel reset
+- session invalidation
+
+In the prototype:
+
+- Transport death ≠ session death (within TTL)
+- Recovery is explicit and auditable
+- Identity continuity is preserved
+
+This demonstrates the architectural difference between
+transport-bound identity models and session-centric models.
