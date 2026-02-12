@@ -1,0 +1,52 @@
+import asyncio
+
+from .logger import JsonlLogger
+from .policy import Policy
+from .session import Session, SessionState
+from .transport import Transport
+
+
+async def main():
+    log = JsonlLogger("out/poc_run.jsonl")
+
+    # Создаём два транспорта
+    tA = Transport(name="LTE_A", base_latency_ms=90, loss_prob=0.18, alive=True)
+    tB = Transport(name="WIFI_B", base_latency_ms=35, loss_prob=0.03, alive=True)
+
+    # Создаём сессию
+    session = Session(
+        session_id="S-POC-001",
+        transports=[tA, tB],
+        policy=Policy(),
+        log=log,
+    )
+
+    log.emit("DemoStart", session_id=session.session_id)
+
+    # Первичное подключение
+    await session.attach_initial()
+
+    # Через 4 секунды "убиваем" основной транспорт
+    async def kill_primary():
+        await asyncio.sleep(4)
+        tA.alive = False
+        log.emit("TransportKilled", session_id=session.session_id, transport=tA.name)
+
+    # Отправка пакетов
+    async def sender():
+        seq = 0
+        for _ in range(40):
+            seq += 1
+            await session.tick_send(seq)
+            if session.state == SessionState.TERMINATED:
+                break
+            await asyncio.sleep(0.25)
+
+        log.emit("DemoEnd", session_id=session.session_id)
+        print("DONE. Check out/poc_run.jsonl")
+
+    await asyncio.gather(sender(), kill_primary())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
