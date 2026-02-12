@@ -153,6 +153,26 @@ This PoC validates behavioral modeling, not production security guarantees.
 
 ---
 
+## 🌐 Real UDP Prototype (Minimal Transport-Level Proof)
+
+A minimal real UDP client/server prototype is available to demonstrate
+session reattachment over an actual transport:
+
+- `poc/real_udp_prototype.py`
+- `poc/README_udp.md`
+
+This prototype shows:
+
+- Session created once (`session_id`)
+- Active transport dies (socket closed / port changes)
+- Client reattaches a new transport using session-bound proof
+- Server emits explicit `TransportSwitch`
+- Session continues without reset (within TTL)
+
+This is behavioral validation only — not production security.
+
+---
+
 ## 🛡 Threat Model & Boundaries
 
 See:
