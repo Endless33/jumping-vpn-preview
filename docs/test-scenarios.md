@@ -160,3 +160,33 @@ A test passes only if behavior is:
 - Deterministic
 - Auditable
 - Bounded by policy
+
+---
+
+## Real Transport Prototype (UDP) — Validation Link
+
+A minimal real UDP prototype exists to validate session reattachment behavior over an actual transport:
+
+- `poc/real_udp_prototype.py`
+- Instructions: `poc/README_udp.md`
+
+### Validates these scenarios
+
+- **Scenario 1 — Transport Death (Hard Failure)**
+  - Client transport dies (socket closed)
+  - Client reattaches using the same session ID
+  - Server emits explicit `TransportSwitch`
+  - Session continues without session reset
+
+- **Scenario 3 — NAT Rebinding (Transport Binding Change)**
+  - New UDP socket uses a new ephemeral port (new binding)
+  - Reattachment updates server-side transport binding explicitly
+
+### Proof Points
+
+On server output, verify:
+- `SessionCreated`
+- `TransportSwitch` (explicit + auditable)
+- Continued `DataAccepted` after reattach
+
+This prototype is behavioral validation only (not production security).
