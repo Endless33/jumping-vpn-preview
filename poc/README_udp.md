@@ -1,77 +1,198 @@
-# Real UDP Prototype — Session Reattach Without Session Reset
+# Jumping VPN — Real UDP Prototype
 
-This prototype demonstrates a **real UDP** client/server flow where:
+## Session Survives Transport Death (Minimal Behavioral Implementation)
+
+This prototype demonstrates a real UDP client/server interaction where:
 
 - A session is created once (`session_id`)
-- The client transport dies (socket closed, port changes)
-- The client reattaches a **new transport** to the same session
-- The server logs an explicit `TransportSwitch`
-- The session continues without creating a new session
+- The active transport dies (UDP socket closed)
+- A new transport is created (new source port)
+- The client reattaches using a session-bound proof
+- The server performs an explicit `TransportSwitch`
+- The session continues without reset or renegotiation
 
-⚠️ This is a behavioral prototype.
-It does NOT implement production cryptography.
-It uses an HMAC as "proof of possession" for demonstration.
+This is a behavioral validation prototype.
+
+It is NOT:
+- a production VPN
+- hardened cryptography
+- a secure key exchange implementation
+
+It exists to validate session-centric behavior over real UDP sockets.
+
+---
+
+## What This Demonstrates
+
+1. Session identity is independent of transport binding.
+2. Transport volatility is handled explicitly.
+3. Reattachment is validated using session-bound proof.
+4. The server logs the transport switch.
+5. The session does not terminate while valid and within TTL.
 
 ---
 
 ## Requirements
 
-- Python 3.10+ recommended (3.8+ should work)
-- Two terminals (or two devices)
+- Python 3.8+
+- Two terminals (or two separate machines)
+- No external dependencies
 
 ---
 
-## Run (Local)
+## How To Run (Localhost)
 
-### Terminal 1 — Start Server
+### Step 1 — Start Server
 
 From repository root:
 
 ```bash
 python poc/real_udp_prototype.py server --bind 0.0.0.0:9999
+```
 
-You should see JSON logs such as:
-ServerStart
-SessionCreated
-Terminal 2 — Start Client
-From repository root:
-Bash
-Копировать код
+Expected server log events:
+
+- `ServerStart`
+- `SessionCreated`
+- `TransportSwitch`
+
+---
+
+### Step 2 — Start Client
+
+In another terminal:
+
+```bash
 python poc/real_udp_prototype.py client --server 127.0.0.1:9999
+```
+
 Expected sequence:
-Client performs HANDSHAKE_INIT → receives session_id
-Client sends a few DATA messages
-Client closes the UDP socket (simulated transport death)
-Client creates a new UDP socket (new local port)
-Client sends REATTACH_REQUEST with session-bound proof
-Server emits TransportSwitch
-Client continues sending DATA under the same session
-What to Look For (Proof)
-On the server output
-You should see:
-SessionCreated
-TransportSwitch
-Example fields:
-session_id
-from_transport
-to_transport
-explicit: true
-auditable: true
-On the client output
-You should see:
-SessionEstablished
-SimulateTransportDeath
-ReattachResult (with REATTACH_ACK)
-continued DataRoundtrip events after reattach
-Notes
-Transport change is simulated by closing and recreating the UDP socket. This usually changes the client’s source port, representing a new transport binding.
-Session persistence on the server is bounded by a TTL: SESSION_TTL_SEC = 30
-If the client waits longer than the TTL before reattaching, the server will drop the session and reject reattachment.
-Security Reminder
-This prototype is for behavioral validation only.
-Production-grade security requires:
-proper key exchange
-robust anti-replay design
-hardened session binding
-security review
-See: docs/threat-model.md and docs/security-review-plan.md.
+
+1. `HANDSHAKE_INIT`
+2. `SessionEstablished`
+3. Multiple `DataRoundtrip`
+4. `SimulateTransportDeath`
+5. New UDP socket created (new local port)
+6. `REATTACH_REQUEST`
+7. Server emits `TransportSwitch`
+8. Continued `DataRoundtrip` without new session creation
+
+---
+
+## How Transport Death Is Simulated
+
+The client deliberately:
+
+- Closes its UDP socket
+- Creates a new socket (new ephemeral port)
+- Sends a `REATTACH_REQUEST` using the same `session_id`
+
+This mimics:
+
+- NAT rebinding
+- Mobile network switch
+- Transport failover
+- UDP path change
+
+---
+
+## Reattachment Mechanism (PoC Level)
+
+The client sends:
+
+- `session_id`
+- `nonce`
+- `proof = HMAC(secret, session_id || nonce)`
+
+The server:
+
+- Verifies proof
+- Updates `bound_addr`
+- Logs `TransportSwitch`
+- Returns `REATTACH_ACK`
+
+This is a minimal proof-of-possession demonstration.
+
+Production systems would require:
+
+- Secure handshake
+- Proper key derivation
+- Anti-replay window management
+- Formal cryptographic validation
+
+---
+
+## Session TTL
+
+The server maintains session state for:
+
+```
+SESSION_TTL_SEC = 30
+```
+
+If no traffic is received within this window:
+
+- The session expires
+- Reattach attempts will fail
+
+This models bounded persistence.
+
+---
+
+## What To Verify
+
+On server output:
+
+- `SessionCreated`
+- `TransportSwitch`
+  - `from_transport`
+  - `to_transport`
+  - `explicit: true`
+  - `auditable: true`
+
+On client output:
+
+- `SessionEstablished`
+- `SimulateTransportDeath`
+- `ReattachResult`
+- Continued `DataRoundtrip`
+
+The key invariant:
+
+Transport death ≠ session death (within TTL and valid proof).
+
+---
+
+## Scope Boundaries
+
+This prototype does NOT:
+
+- Encrypt payload data
+- Implement forward secrecy
+- Provide anonymity
+- Claim censorship resistance
+- Provide production security guarantees
+
+It strictly validates behavioral modeling of session-centric transport reattachment.
+
+---
+
+## Architectural Context
+
+Related documentation:
+
+- `docs/state-machine.md`
+- `docs/threat-model.md`
+- `docs/security-review-plan.md`
+- `docs/test-scenarios.md`
+- `docs/use-case-fintech-failover.md`
+
+---
+
+## Summary
+
+This prototype validates a core principle:
+
+The session is the anchor.  
+Transport is volatile.  
+Volatility is modeled — not treated as fatal failure.
