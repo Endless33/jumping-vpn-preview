@@ -1,116 +1,119 @@
-# Jumping VPN — Architecture Diagrams (ASCII)
+# Jumping VPN — Architecture Overview (Readable Version)
 
-These diagrams describe the architectural model of Jumping VPN
+Session is the anchor.  
+Transport is volatile.
+
+This document describes the structural model of Jumping VPN
 in a reviewer-friendly format.
 
-Session is the anchor. Transport is volatile.
+---
+
+## 1) High-Level Structure
+
+Client Agent
+- Session Context (session_id, keys, policy)
+- Transport Adapters (UDP / TCP / QUIC)
+- Volatility detection
+- Reattach initiation
+
+↓
+
+Server Gateway
+- Session Table (authoritative ownership)
+- TTL enforcement
+- State version control (CAS)
+- Transport binding validation
+
+↓
+
+Observability Layer (Non-Blocking)
+- STATE_CHANGE events
+- TRANSPORT_SWITCH events
+- SECURITY_EVENT logs
+- Export to SIEM / monitoring
 
 ---
 
-## 1) High-Level System View
+## 2) Session vs Transport Separation
 
-+-------------------+                         +----------------------+ |     Client Agent  |                         |    Server Gateway    | |-------------------|                         |----------------------| | Session Context   |                         | Session Table        | |  - session_id     |  Control Plane          |  - ownership         | |  - keys (abstract)|<----------------------->|  - TTLs              | |  - policy         |                         |  - state_version     | |                   |                         |                      | | Transport Adapters|  Data Plane (abstract)  | Transport Listeners  | |  - UDP/TCP/QUIC   |========================>|  - UDP/TCP/QUIC      | +-------------------+                         +----------------------+
+Session (Identity Anchor)
+- session_id (stable)
+- cryptographic context (abstracted)
+- policy snapshot
+- state machine
 
-+----------------------------------------------+
-             |        Observability (Non-Blocking)          |
-             |  Events: STATE_CHANGE, SWITCH, SECURITY, ... |
-             |  Export: SIEM / NOC / Logs / Dashboard       |
-             +----------------------------------------------+
+Transport (Replaceable Attachment)
+- ip:port
+- protocol
+- route / NAT mapping
+- quality metrics (loss / latency / jitter)
+
+Transport death does NOT imply session death  
+(within TTL and policy bounds).
 
 ---
 
-## 2) Session vs Transport Model
+## 3) State Model
 
-SESSION (Identity Anchor)             TRANSPORT (Replaceable Attachment)
-session_id (stable)                   ip:port / proto / interface keys (session-bound)                  NAT mapping / route / path policy snapshot                        quality fluctuates state machine                           may die anytime
-Transport death != Session death (within TTL + policy bounds)
+States:
 
----
-
-## 3) State Machine (Conceptual)
-
-+-------+
-       | BIRTH |
-       +-------+
-           |
-           | handshake ok
-           v
-      +-----------+
-      | ATTACHED  |<-----------------------------+
-      +-----------+                              |
-           |                                     |
-
-instability  |                                     | recovered detected    v                                     | +-----------+                               | | VOLATILE  |                               | +-----------+                               | |                                     | bounds hit |                                     | v                                     | +-----------+                               | | DEGRADED  |                               | +-----------+                               | |                                     | transport dead|                                     | v                                     | +-----------+     reattach ok               | | RECOVERING|-------------------------------+ +-----------+ | | TTL expired / policy exceeded v +-----------+ | TERMINATED| +-----------+
+BIRTH  
+ATTACHED  
+VOLATILE  
+DEGRADED  
+RECOVERING  
+TERMINATED  
 
 Rules:
-- Transitions are explicit and reason-coded
-- state_version increments on mutation
-- ambiguity fails closed
+
+- Transitions are explicit
+- Every mutation increments state_version
+- Ambiguity fails closed
+- Dual-active transport is forbidden
 
 ---
 
-## 4) Control Plane Flow — Reattach
+## 4) Reattach Flow (Simplified)
 
-(1) Transport dies Client/Server emits: TRANSPORT_DEAD ATTACHED -> RECOVERING
-(2) Client finds candidate path Candidate transport appears (udp/tcp/quic)
-(3) Client sends REATTACH_REQUEST
-session_id
-nonce (freshness)
-proof-of-possession (abstract)
-candidate transport metadata
-expected state_version
-(4) Server validates
-session exists + TTL valid
-nonce freshness (anti-replay)
-proof valid
-ownership authoritative
-CAS(state_version) succeeds
-no dual-active binding
-(5) Server binds new transport Server emits: TRANSPORT_SWITCH + STATE_CHANGE
-(6) Session returns RECOVERING -> ATTACHED No identity reset
+1) Transport failure detected  
+2) Session enters RECOVERING  
+3) Client sends REATTACH_REQUEST  
+4) Server validates:
+   - session exists
+   - TTL valid
+   - proof-of-possession valid
+   - nonce fresh
+   - state_version matches
+   - no dual-active conflict
+5) Server binds new transport  
+6) Session returns to ATTACHED  
 
----
+If validation fails → explicit REJECT or TERMINATE.
 
-## 5) Safety Gates (Fail Closed)
-
-REATTACH_REQUEST -> VALIDATION GATES:
-[Gate A] session exists + TTL valid [Gate B] state_version matches expected (CAS) [Gate C] nonce fresh (anti-replay) [Gate D] proof valid (crypto module) [Gate E] ownership authoritative (cluster safety) [Gate F] dual-active forbidden
-If any gate fails: -> deterministic REJECT (reason-coded) or -> deterministic TERMINATE (reason-coded)
+No silent resets.
 
 ---
 
-## 6) Cluster Ownership (Conceptual)
+## 5) Cluster Ownership (Conceptual)
 
-### Option A: Sticky Routing
+Two safe models:
 
-SessionID --hash--> Gateway Node (authoritative) Only that node may accept reattach.
+A) Sticky routing  
+SessionID maps to a single authoritative node.
 
-### Option B: Shared Atomic Store
+B) Shared atomic store  
+CAS-based state_version prevents dual binding.
 
-All gateways share:
-session table
-CAS version field Only one winner can bind a transport. Others reject deterministically.
-
-Rule:
-- Consistency is preferred over ambiguous continuation.
-
----
-
-## 7) Observability Timeline (Example)
-
-t0   STATE_CHANGE: ATTACHED t1   VOLATILITY_SIGNAL: LOSS_SPIKE t2   STATE_CHANGE: VOLATILE t3   TRANSPORT_DEAD: NO_DELIVERY_WINDOW t4   STATE_CHANGE: RECOVERING t5   REATTACH_REQUEST_SENT t6   TRANSPORT_SWITCH: CANDIDATE_SELECTED t7   REATTACH_ACK_RECEIVED t8   STATE_CHANGE: ATTACHED
-
-Observability must be:
-- structured
-- reason-coded
-- non-blocking
+Consistency is preferred over ambiguous continuation.
 
 ---
 
 ## Final Principle
 
-Jumping VPN is not defined by features.
-It is defined by behavior over time.
+Control-plane correctness is more important than transport survival.
+
+If correctness cannot be guaranteed,
+the session must terminate explicitly.
 
 Session is the anchor.  
 Transport is volatile.
