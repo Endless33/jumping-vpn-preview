@@ -48,11 +48,11 @@ The session is the source of truth.
 
 Transport failover is:
 
-- explicit
-- policy-bounded
-- rate-limited
-- logged
-- auditable
+- explicit  
+- policy-bounded  
+- rate-limited  
+- logged  
+- auditable  
 
 No silent renegotiation.  
 No uncontrolled session resets.
@@ -180,6 +180,27 @@ This project may be relevant to:
 - fintech platforms experiencing session collapse during failover
 - security architects designing deterministic recovery systems
 - operators exploring transport abstraction models
+
+---
+
+## 🧭 Project Philosophy
+
+Jumping VPN is not driven by market validation cycles
+or short-term visibility.
+
+It is an architectural thesis.
+
+The system evolves based on behavioral correctness,
+formal constraints, and internal consistency —
+not external approval.
+
+Ideas compete in the open.
+Architectures mature over time.
+
+This repository documents that evolution.
+
+Architecture does not require permission to exist.
+It requires rigor.
 
 ---
 
