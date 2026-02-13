@@ -1,71 +1,62 @@
-# Jumping VPN — Formal Behavioral Specification (Outline)
+# Jumping VPN — Formal Specification Outline (Preview)
 
 Status: Draft  
-Version: 0.1-preview  
-Scope: Session continuity under transport volatility
+Intended audience: protocol engineers, reviewers, system architects  
+Scope: Session lifecycle and transport volatility behavior  
 
-This document outlines a formal behavioral contract
-for Jumping VPN.
+This document outlines a formal-style specification for Jumping VPN’s
+session-centric control model.
 
-It is structured in RFC-style sections for clarity and review.
+It defines normative requirements using RFC-style terminology.
 
 ---
 
 # 1. Terminology
 
-The following terms are normative:
+The key words:
 
-- MUST
-- MUST NOT
-- SHOULD
-- SHOULD NOT
-- MAY
+MUST  
+MUST NOT  
+SHOULD  
+SHOULD NOT  
+MAY  
 
-These are to be interpreted as described in RFC 2119.
+are to be interpreted as described in RFC 2119.
 
 ---
 
 # 2. System Model
 
+Jumping VPN defines a session-layer control model independent of transport.
+
 The system consists of:
 
-- A Client Agent
-- A Server Gateway
-- An optional Cluster Ownership Layer
-- A Policy Engine
+- Session identity (persistent within bounds)
+- Transport binding (replaceable)
+- Deterministic state machine
+- Policy-constrained recovery model
 
-The system operates over one or more volatile transport paths.
-
----
-
-# 3. Core Abstractions
-
-## 3.1 Session
-
-A Session is defined as:
-
-- A stable identity anchor (SessionID)
-- A cryptographic context
-- A policy context
-- A versioned state
-
-A Session MUST exist independently of any single transport.
+The session is the identity anchor.
 
 ---
 
-## 3.2 Transport
+# 3. Session Object
 
-A Transport is:
+A session MUST include:
 
-- A temporary binding
-- A delivery channel
-- A replaceable attachment
+- session_id (stable identifier)
+- state (enumerated)
+- state_version (monotonic counter)
+- active_transport (nullable)
+- policy (bounded configuration)
+- ttl parameters
+- replay protection context
 
-Transport MAY change without mutating session identity.
+The session_id MUST NOT change across transport reattachment.
 
 ---
 
-# 4. State Machine
+# 4. State Model
 
 The following states are defined:
 
@@ -76,188 +67,275 @@ The following states are defined:
 - RECOVERING
 - TERMINATED
 
-All transitions MUST be:
+State transitions MUST be:
 
-- Explicit
-- Deterministic
-- Reason-coded
-- Logged (non-blocking)
+- explicit
+- reason-coded
+- versioned
+- auditable
 
-No implicit state transitions are allowed.
-
----
-
-# 5. Invariants
-
-The following invariants MUST hold:
-
-1. At most one active transport binding per session.
-2. SessionID MUST NOT change across transport reattach.
-3. No dual-active binding is permitted.
-4. Recovery MUST be bounded by policy.
-5. All critical transitions MUST be auditable.
-6. Ambiguous ownership MUST result in rejection.
-
-Violation of invariants MUST result in termination
-or deterministic rejection.
+Silent transitions are forbidden.
 
 ---
 
-# 6. Transport Death Detection
+# 5. State Version Semantics
 
-Transport is considered DEAD when:
+Every successful state mutation:
 
-- No successful delivery occurs within TransportLossTTL
-- OR health metrics exceed policy-defined thresholds
+MUST increment state_version by exactly +1.
 
-Transport death MUST trigger:
+A mutation attempt with stale state_version:
 
-- RECOVERING state
-- Explicit REATTACH flow
+MUST be rejected.
 
-Silent fallback is forbidden.
+Rollback of state_version is forbidden.
 
 ---
 
-# 7. Reattach Procedure
+# 6. Transport Binding Rules
 
-The client MUST send:
+At any time:
 
-- SessionID
-- Proof-of-possession
-- Freshness marker
-- Optional metadata
+A session MUST have at most one ACTIVE transport.
 
-The server MUST:
+During reattachment:
 
-- Validate ownership
-- Validate proof-of-possession
-- Validate freshness window
-- Enforce rate limits
-- Enforce TTL constraints
+- Previous transport MUST be deactivated
+- New transport MUST be validated
+- Binding MUST be atomic
+- state_version MUST increment
 
-If validation succeeds:
-
-- Bind new transport
-- Emit TransportSwitch event
-- Transition to ATTACHED
-
-If validation fails:
-
-- Emit explicit failure event
-- Remain in bounded state
-- Terminate if policy requires
+Dual-active binding is forbidden.
 
 ---
 
-# 8. Policy Constraints
+# 7. Transport Failure Semantics
 
-Policy MUST define:
+Transport death is defined as:
 
-- MaxRecoveryWindowMs
-- MaxSwitchesPerMinute
-- TransportLossTTL
-- SessionTTL
-- Quality thresholds (loss/latency/jitter)
+No viable delivery within bounded observation window.
 
-Policy MUST be deterministic and reproducible.
+Upon detection:
 
----
+ATTACHED → RECOVERING
 
-# 9. Anti-Replay Requirements
+Transition MUST:
 
-Reattach MUST enforce:
-
-- Freshness validation
-- Replay window tracking
-- Deterministic rejection of stale proofs
-
-Replay attempts MUST NOT mutate session state.
+- be explicit
+- include reason_code
+- increment state_version
 
 ---
 
-# 10. Cluster Ownership
+# 8. Reattach Procedure
 
-If deployed in a cluster:
+A REATTACH_REQUEST MUST include:
 
-The system MUST implement one of:
+- session_id
+- state_version
+- proof-of-possession
+- freshness marker (nonce)
+- candidate transport metadata
+
+Server MUST validate:
+
+- session existence
+- TTL validity
+- proof-of-possession
+- nonce freshness
+- ownership authority
+- state_version match
+
+Failure MUST result in explicit rejection.
+
+No silent acceptance.
+
+---
+
+# 9. Recovery Bound
+
+Recovery MUST be bounded by:
+
+- max_recovery_window_ms
+- max_switches_per_window
+- cooldown constraints
+
+If recovery exceeds defined bounds:
+
+Session MUST transition to:
+
+DEGRADED or TERMINATED
+
+No infinite retry loops are permitted.
+
+---
+
+# 10. Replay Protection
+
+Client nonce MUST be monotonic.
+
+Server MUST maintain replay window.
+
+If nonce reuse is detected:
+
+Request MUST be rejected.
+
+Replay rejection MUST NOT mutate session state.
+
+---
+
+# 11. TTL Semantics
+
+Two TTL values MUST exist:
+
+1. session_ttl
+2. transport_loss_ttl
+
+If session_ttl expires:
+
+Session MUST terminate.
+
+If transport_loss_ttl expires during recovery:
+
+Session MUST terminate.
+
+Termination MUST be explicit.
+
+---
+
+# 12. Cluster Ownership
+
+In multi-node deployments:
+
+A session MUST have authoritative ownership.
+
+Acceptable models:
 
 - Sticky routing (SessionID → node)
-- Atomic shared store with versioned CAS
+- Atomic shared store (CAS/transactional update)
 
-Split-brain MUST result in reattach denial.
+If ownership ambiguity is detected:
 
-Dual-active identity is forbidden.
+Reattach MUST be rejected.
 
----
-
-# 11. Failure Semantics
-
-If recovery exceeds policy bounds:
-
-Session MUST enter:
-
-- DEGRADED
-OR
-- TERMINATED
-
-Undefined states are forbidden.
-
-Silence is forbidden.
+Consistency is preferred over availability.
 
 ---
 
-# 12. Observability Requirements
+# 13. Failure Behavior
 
-The system MUST emit:
+Under the following conditions:
 
-- STATE_CHANGE
-- TRANSPORT_SWITCH
-- SECURITY_EVENT (if applicable)
+- state_version mismatch
+- dual-active conflict
+- invalid proof
+- nonce replay
+- TTL expiry
+- ownership ambiguity
 
-Observability MUST NOT block correctness.
+The system MUST:
 
-Logging failure MUST NOT alter state.
-
----
-
-# 13. Non-Goals (Normative)
-
-The protocol does NOT guarantee:
-
-- Global anonymity
-- Endpoint compromise protection
-- Censorship bypass guarantees
-- Side-channel resistance
-- Data-plane cryptographic specification (in this draft)
+Reject deterministically  
+Emit reason-coded error  
+Avoid silent mutation  
 
 ---
 
-# 14. Security Philosophy
+# 14. Observability Requirements
 
-Security is defined as:
+All critical transitions MUST emit:
 
-- Bounded behavior
-- Deterministic transitions
-- Explicit ownership
-- Invariant preservation
+- event_type
+- session_id
+- state_version
+- reason_code
+- timestamp
 
-Heuristic-only adaptation is forbidden.
+Logging failure MUST NOT block state transitions.
+
+---
+
+# 15. Non-Goals
+
+This specification does NOT define:
+
+- data-plane encryption format
+- packet framing
+- multiplexing layer
+- anonymity guarantees
+- censorship bypass techniques
+
+It defines behavioral determinism only.
 
 ---
 
-# 15. Future Extensions (Non-Normative)
+# 16. Security Boundary
 
-- Multi-hop chains under invariant preservation
-- QUIC transport integration
-- Formal verification feasibility
-- High-churn benchmarking
-- Distributed ownership scaling
+The protocol assumes:
 
-These extensions MUST preserve core invariants.
+An attacker MAY:
+
+- observe transport metadata
+- disrupt connectivity
+- inject replay attempts
+
+The protocol MUST guarantee:
+
+- identity continuity within policy bounds
+- no silent reset
+- no ambiguous dual continuation
+- deterministic rejection under ambiguity
 
 ---
+
+# 17. Determinism Principle
+
+Given identical:
+
+- prior state
+- input message
+- policy configuration
+- time constraints
+
+The system MUST produce identical:
+
+- state transition
+- output decision
+- rejection reason
+
+Randomness MUST NOT influence state transitions.
+
+---
+
+# 18. Termination Rule
+
+If correctness cannot be guaranteed:
+
+The session MUST terminate explicitly.
+
+Survivability MUST NOT override safety invariants.
+
+---
+
+# 19. Versioning
+
+Future revisions MUST:
+
+- preserve core invariants
+- maintain backward compatibility where feasible
+- explicitly version new message types
+- avoid altering determinism guarantees
+
+---
+
+# 20. Final Statement
+
+Jumping VPN formalizes volatility at the session layer.
+
+Transport instability is modeled behavior.
+
+Identity continuity is bounded and deterministic.
 
 Session is the anchor.  
 Transport is volatile.  
-Behavior must be deterministic.
+Correctness is non-negotiable.
