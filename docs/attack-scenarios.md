@@ -1,235 +1,257 @@
-# Jumping VPN — Attack Scenarios & Behavioral Response
+# Attack Scenarios & Expected Behavior — Jumping VPN (Preview)
 
-Status: Architectural Threat Modeling (Public Preview)
+This document models realistic adversarial situations
+and defines the expected deterministic behavior of the system.
 
-This document describes adversarial scenarios
-and the expected behavioral response of the system.
-
-The purpose is not to claim invulnerability.
-It is to demonstrate deterministic handling of volatility
-under hostile conditions.
+The purpose is to test architectural invariants under pressure.
 
 ---
 
-# 1. Induced Packet Loss Attack
+# 1. Packet Loss Spike (Transport Degradation)
 
 ## Scenario
 
-An attacker induces artificial packet loss on the active transport
-(e.g., targeted interference, rate limiting, path disruption).
+- Sudden packet loss spike (20–60%)
+- Latency increases
+- Transport still partially delivers traffic
 
 ## Expected Behavior
 
-- ATTACHED → VOLATILE
-- Volatility detection triggered via:
-  - LOSS_VOLATILE_THRESHOLD
-  - MAX_CONSECUTIVE_DROPS
-- Switch initiated if candidate transport exists
+- Session enters VOLATILE or DEGRADED
+- No identity reset
+- No silent renegotiation
+- Switch only if policy thresholds exceeded
+- TransportSwitch event emitted (if triggered)
+- State transition is explicit and reason-coded
 
-## Guarantees
+## Forbidden Outcomes
 
-- Session remains intact
-- No renegotiation
-- No silent identity reset
-- Explicit TransportSwitch event logged
+- Silent session reset
+- Dual-active transport binding
+- Infinite oscillation
 
 ---
 
-# 2. Transport Flapping Attack
+# 2. Hard Transport Death
 
 ## Scenario
 
-Attacker alternates path stability rapidly,
-attempting to force oscillation and CPU churn.
+- Transport stops delivering packets entirely
+- No viable delivery within TransportLossTtlMs
 
 ## Expected Behavior
 
-- Switch attempts bounded by MAX_SWITCHES_PER_MIN
-- SWITCH_COOLDOWN_MS enforced
-- Session enters DEGRADED if instability persists
+- Client enters RECOVERING
+- REATTACH_REQUEST sent
+- Server validates:
+  - proof-of-possession
+  - freshness
+  - ownership authority
+- If valid → ATTACHED (new transport)
+- If TTL exceeded → TERMINATED
 
-## Guarantees
+## Forbidden Outcomes
 
-- No infinite switching loop
-- No unbounded resource usage
-- Switch denials are logged and auditable
+- Implicit identity renegotiation
+- Silent state mutation
+- Dual-active binding
 
 ---
 
-# 3. Reattach Replay Attack
+# 3. Replay Attack on Reattach
 
 ## Scenario
 
-Attacker captures a valid reattach message
-and attempts replay during RECOVERING state.
-
-## Required Controls
-
-- Nonce-based replay protection
-- REATTACH_PROOF_MAX_AGE_MS enforcement
-- Cryptographic binding to session identity
+Attacker replays old REATTACH_REQUEST
+with valid but stale data.
 
 ## Expected Behavior
 
+- Replay window validation fails
 - Reattach rejected
-- RECOVERING → DEGRADED
-- Reason: reattach_validation_failed
+- SECURITY_EVENT logged
+- No state transition occurs
 
-## Guarantee
+## Forbidden Outcomes
 
-No unauthorized transport binding.
+- Rebinding of stale transport
+- State rollback
+- Silent acceptance
 
 ---
 
-# 4. Session Hijack Attempt During Volatility
+# 4. Reattach Flood / Control Plane Abuse
 
 ## Scenario
 
-Attacker attempts to bind a malicious transport
-while legitimate transport is unstable.
-
-## Required Guarantee
-
-Reattach must require:
-
-- Valid session proof
-- Key possession validation
-- Freshness constraints
+Attacker floods gateway with reattach attempts
+for unknown or random SessionIDs.
 
 ## Expected Behavior
 
-- Invalid attempt rejected
-- No state corruption
-- Session remains bound to valid identity
+- Early rejection for unknown sessions
+- Rate limiting triggered
+- No allocation of session state
+- No state mutation
+
+## Forbidden Outcomes
+
+- Resource exhaustion via session allocation
+- Transport switch triggered by invalid request
+- Control-plane state mutation
 
 ---
 
-# 5. NAT Expiry & Legitimate Rebinding
+# 5. Split-Brain Reattach (Cluster Conflict)
 
 ## Scenario
 
-NAT mapping expires naturally.
-Client appears from new source port/IP.
+Two cluster nodes simultaneously receive valid reattach
+for the same SessionID.
 
 ## Expected Behavior
 
-- Volatility detection
-- Reattach validation
-- RECOVERING → ATTACHED
+- Ownership authority check enforced
+- Only authoritative node accepts
+- Other node rejects
+- If ambiguity cannot be resolved → rejection
+- No dual-active binding
 
-## Guarantee
+## Forbidden Outcomes
 
-Legitimate mobility supported.
-No identity reset required.
+- Two active transports for same session
+- Session divergence between nodes
 
 ---
 
-# 6. Complete Path Blackout
+# 6. Flapping Transport (Rapid Instability)
 
 ## Scenario
 
-All transports unavailable.
-Network connectivity temporarily lost.
+Transport alternates between alive and dead rapidly.
 
 ## Expected Behavior
 
-- ATTACHED → VOLATILE → DEGRADED
-- Session survives within TRANSPORT_LOST_TTL_MS
-- After TTL → TERMINATED
+- Switch-rate bounded
+- Cooldown applied
+- Session may enter DEGRADED
+- Explicit termination if bounds exceeded
 
-## Guarantee
+## Forbidden Outcomes
 
-No indefinite zombie session.
+- Infinite switching loop
+- State oscillation without bound
+- Unbounded CPU growth
 
 ---
 
-# 7. Recovery Window Exhaustion Attack
+# 7. Partial Failure (Selective Packet Corruption)
 
 ## Scenario
 
-Attacker prevents successful reattach repeatedly
-to exhaust recovery window.
+Some packets succeed, some are corrupted or dropped.
 
 ## Expected Behavior
 
-- RECOVERING → DEGRADED
-- If policy threshold exceeded → TERMINATED
+- Quality floor detection
+- DEGRADED state possible
+- No silent corruption
+- Explicit observability event
 
-## Guarantee
+## Forbidden Outcomes
 
-Bounded retry.
-No infinite recovery loop.
+- Silent integrity assumption
+- Identity mutation
+- Undetected corruption state
 
 ---
 
-# 8. Switch Rate Abuse
+# 8. On-Path Latency Manipulation
 
 ## Scenario
 
-Attacker triggers repeated instability events
-to exceed switch threshold.
+Attacker injects artificial delay
+to trigger switch conditions.
 
 ## Expected Behavior
 
-- TransportSwitchDenied
-- DEGRADED state enforced
-- No further switching until cooldown
+- Multi-signal gating (loss + window + thresholds)
+- No switch on single spike
+- Hysteresis respected
+- Switch only if policy-bound criteria met
 
-## Guarantee
+## Forbidden Outcomes
 
-Deterministic anti-flapping behavior.
+- Switch triggered by single packet anomaly
+- Heuristic-driven instability
 
 ---
 
-# 9. Split-Brain Risk Scenario
+# 9. Ownership Store Unavailable
 
 ## Scenario
 
-Client and server disagree on session state after volatility.
-
-## Required Design Constraint
-
-State transitions must be:
-
-- Explicit
-- Logged
-- Versioned
-- Rejecting unknown transitions
+Cluster ownership storage temporarily unavailable.
 
 ## Expected Behavior
 
-- Invalid state transition rejected
-- No dual-active session state
+- Reattach denied safely
+- No ambiguous binding
+- Session may degrade or terminate deterministically
+
+Consistency preferred over availability.
+
+## Forbidden Outcomes
+
+- Dual-active continuation
+- Unverified transport binding
 
 ---
 
-# 10. Observability Under Attack
+# 10. Policy-Bound Expiration
 
-Under all adversarial scenarios:
+## Scenario
 
-- SessionStateChange MUST be logged
-- Reason code MUST be emitted
-- TransportSwitch events MUST be auditable
-- No silent state mutation allowed
+Session TTL or TransportLoss TTL exceeded.
+
+## Expected Behavior
+
+- Explicit TERMINATED state
+- Reason-coded transition
+- Audit event emitted
+
+## Forbidden Outcomes
+
+- Silent expiration
+- Undocumented state disappearance
 
 ---
 
-# Final Statement
+# 11. Evaluation Rule
 
-Jumping VPN does not assume stable networks.
+For every attack scenario:
 
-It assumes:
+- State transitions must be explicit
+- Identity must remain consistent unless terminated
+- No silent behavior is allowed
+- Recovery must be bounded
+- Invariants must hold
 
-- Active adversaries
-- Induced instability
-- Path manipulation
-- Replay attempts
-- Flapping behavior
+If any invariant is violated,
+the architecture fails.
 
-Security is not guaranteed by optimism.
-It is enforced by bounded, explicit transitions.
+---
 
-Volatility without structure is chaos.
+# 12. Architectural Principle
 
-Volatility with deterministic constraints
-is survivable.
+The purpose of this document is not to claim invulnerability.
+
+It is to demonstrate:
+
+Deterministic behavior under adversarial pressure.
+
+---
+
+Session is the anchor.  
+Transport is volatile.  
+Ambiguity is failure.
