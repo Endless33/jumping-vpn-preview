@@ -2,61 +2,60 @@ from __future__ import annotations
 
 from core.common.errors import InvariantError
 from core.common.reason_codes import ReasonCode
-from core.common.models import Session, TransportBinding, SessionState
+from core.common.models import SessionRecord, SessionState, TransportBinding
 
 
-def assert_single_active_binding(session: Session) -> None:
-    """
-    Ensures a session has at most one active transport binding.
-    """
-    active = [t for t in session.transports if t.active]
-    if len(active) > 1:
+def assert_not_terminated(rec: SessionRecord) -> None:
+    if rec.state == SessionState.TERMINATED:
         raise InvariantError(
-            reason=ReasonCode.DUAL_ACTIVE_BINDING,
-            message="Multiple active transport bindings detected",
-            details={"active_count": len(active)}
+            reason=ReasonCode.INVALID_STATE_TRANSITION,
+            message="Operation attempted on a TERMINATED session",
+            details={"session_id": rec.session_id},
         )
 
 
-def assert_session_not_terminated(session: Session) -> None:
-    """
-    Prevents illegal transitions after termination.
-    """
-    if session.state == SessionState.TERMINATED:
+def assert_state_version_monotonic(old_version: int, new_version: int) -> None:
+    if new_version <= old_version:
         raise InvariantError(
-            reason=ReasonCode.ILLEGAL_STATE_TRANSITION,
-            message="Operation attempted on terminated session"
-        )
-
-
-def assert_state_version_monotonic(previous_version: int, new_version: int) -> None:
-    """
-    Ensures state version never rolls back.
-    """
-    if new_version <= previous_version:
-        raise InvariantError(
-            reason=ReasonCode.VERSION_ROLLBACK,
+            reason=ReasonCode.INVARIANT_VIOLATION,
             message="State version rollback detected",
-            details={
-                "previous_version": previous_version,
-                "new_version": new_version,
-            }
+            details={"old_version": old_version, "new_version": new_version},
         )
 
 
-def assert_transport_belongs_to_session(
-    session: Session,
-    transport: TransportBinding
-) -> None:
+def assert_single_active_binding(rec: SessionRecord) -> None:
     """
-    Ensures a transport binding belongs to the session.
+    In this model, 'single-active' is represented by exactly one field:
+    rec.active_transport. So we enforce consistency rules around it.
     """
-    if transport.session_id != session.session_id:
+    # If ATTACHED, we MUST have an active transport
+    if rec.state == SessionState.ATTACHED and rec.active_transport is None:
         raise InvariantError(
-            reason=ReasonCode.TRANSPORT_SESSION_MISMATCH,
-            message="Transport binding does not belong to session",
+            reason=ReasonCode.INVARIANT_VIOLATION,
+            message="ATTACHED session has no active transport",
+            details={"session_id": rec.session_id},
+        )
+
+    # If TERMINATED, we MUST NOT have an active transport
+    if rec.state == SessionState.TERMINATED and rec.active_transport is not None:
+        raise InvariantError(
+            reason=ReasonCode.INVARIANT_VIOLATION,
+            message="TERMINATED session still has active transport bound",
+            details={"session_id": rec.session_id},
+        )
+
+
+def assert_transport_has_identity(binding: TransportBinding) -> None:
+    """
+    TransportBinding must be well-formed (no empty identifiers).
+    """
+    if not binding.transport_id or not binding.remote_ip or not binding.proto:
+        raise InvariantError(
+            reason=ReasonCode.INVARIANT_VIOLATION,
+            message="Malformed transport binding",
             details={
-                "session_id": session.session_id,
-                "transport_session_id": transport.session_id,
-            }
+                "transport_id": binding.transport_id,
+                "remote_ip": binding.remote_ip,
+                "proto": binding.proto,
+            },
         )
