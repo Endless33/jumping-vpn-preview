@@ -1,193 +1,325 @@
-# Jumping VPN — Deployment Model (Public Preview)
+# Deployment Model — Jumping VPN (Preview)
 
-Status: Architectural Integration Outline
+This document describes how Jumping VPN can be deployed
+in real-world environments while preserving
+deterministic session continuity.
 
-This document describes how Jumping VPN is intended to be deployed
-within real-world infrastructure environments.
-
-This is not a packaging document.
-It defines integration architecture.
-
----
-
-# 1. Deployment Position in Stack
-
-Jumping VPN sits:
-
-Client
-↓
-Session Control Layer (Jumping VPN)
-↓
-Transport Layer (UDP / QUIC / TCP)
-↓
-Network Infrastructure
-
-It does not replace the transport.
-It governs session behavior above it.
+This is a control-plane deployment model.
+Data-plane optimization is out of scope.
 
 ---
 
-# 2. Client-Side Deployment
+# 1. Deployment Goals
 
-Jumping VPN client:
+A production deployment must guarantee:
 
-- Maintains session identity
-- Monitors transport health
-- Executes bounded switching logic
-- Emits observability events
+- Single authoritative session ownership
+- Deterministic recovery behavior
+- Bounded failover windows
+- Explicit rejection under ambiguity
+- Horizontal scalability
+- Failure isolation
 
-Client can operate:
-
-- On end-user device
-- On managed enterprise workstation
-- On embedded/mobile device
-- On infrastructure edge node
+Deployment architecture must not violate invariants.
 
 ---
 
-# 3. Server-Side Deployment
+# 2. Core Components
 
-Server component:
+A minimal production deployment includes:
 
-- Maintains session table
-- Validates reattach proof
-- Enforces policy constraints
-- Emits state transition logs
+Client Agent
+Gateway Node (Edge)
+Session Ownership Layer
+Policy Engine
+Observability Pipeline
 
-Server must be deployed:
-
-- In hardened environment
-- Behind firewall policy
-- With rate limiting for reattach attempts
-- With audit logging enabled
-
----
-
-# 4. Horizontal Scaling Model
-
-Session control layer supports:
-
-- Stateless transport binding logic
-- Session table lookup by SessionID
-- Explicit termination policy
-
-Scaling approaches:
-
-- Sticky session routing
-- Shared session store (bounded)
-- Session-aware load balancing
-
-Cluster consistency must prevent:
-
-- Split-brain session state
-- Dual active session binding
+Optional:
+Load Balancer
+Distributed Session Store
+Rate Limiting Layer
+Monitoring Stack
 
 ---
 
-# 5. Observability Integration
+# 3. Deployment Topologies
 
-Jumping VPN must export:
+## 3.1 Single-Node Deployment (Development / Pilot)
 
-- SessionStateChange events
-- TransportSwitch events
-- TransportSwitchDenied events
-- SessionTerminated events
+Client → Gateway
 
-Integration targets:
+Characteristics:
 
-- SIEM systems
-- SOC pipelines
-- Centralized logging
-- Metrics dashboards
+- In-memory session store
+- No cluster ownership complexity
+- Suitable for:
+  - Early testing
+  - Controlled pilots
+  - Architecture validation
 
-Observability is mandatory in enterprise deployments.
+Limitations:
 
----
-
-# 6. Policy Configuration Layer
-
-Deployment must define:
-
-- Switch thresholds
-- Recovery windows
-- Session TTL
-- Switch rate limits
-- Allowed transport classes
-
-Policy may vary by:
-
-- Environment type
-- Risk profile
-- Regulatory constraints
-- Infrastructure quality
+- No horizontal scaling
+- Single point of failure
+- Limited recovery guarantees if node crashes
 
 ---
 
-# 7. Mobile & Edge Environments
+## 3.2 Sticky Routing Cluster (Recommended Early Production)
 
-Special considerations:
+Client → Load Balancer → Gateway Cluster
 
-- NAT rebinding frequency
-- Variable latency
-- Interface switching (WiFi ↔ LTE)
-- Carrier-grade NAT
+Session routing:
 
-Jumping VPN is optimized for:
+SessionID → consistent hash → specific gateway
 
-- Volatile mobility
-- Intermittent degradation
-- Cross-border route instability
+Properties:
 
----
+- Session ownership is deterministic
+- No shared mutable state required
+- Horizontal scaling possible
+- High performance
+- Low operational complexity
 
-# 8. Failure Domain Isolation
+Failure behavior:
 
-Deployment must ensure:
+If gateway node dies:
+Sessions owned by that node must terminate
+or
+Recover via explicit re-handshake
 
-- Session state corruption does not propagate
-- Transport failure in one node does not cascade
-- Recovery logic is bounded
-
-Transport volatility is isolated per session.
+No silent migration.
 
 ---
 
-# 9. Upgrade & Versioning Model
+## 3.3 Shared Atomic Session Store (Advanced Deployment)
 
-Deployment must support:
+Client → Load Balancer → Gateway Cluster
+                           ↓
+                    Shared Session Store (CAS)
 
-- Protocol version negotiation
-- Backward-compatible session handling
-- Graceful migration across minor versions
-- Hard termination across incompatible versions
+Session store requirements:
 
-No silent protocol mutation allowed.
+- Atomic compare-and-set
+- Versioned writes
+- Ownership tracking
+- TTL enforcement
+
+Properties:
+
+- Reattach can occur across nodes
+- Deterministic ownership preserved
+- More operational complexity
+- Higher latency
+
+Tradeoff:
+
+Scalability vs simplicity.
+
+Consistency preferred over availability.
 
 ---
 
-# 10. Deployment Risks
+# 4. Session Ownership Rules
 
-Operators must consider:
+At any time:
 
-- Misconfigured thresholds
-- Excessive switch rate limits
-- Insufficient observability
-- Inadequate security binding
+One and only one gateway is authoritative
+for a given SessionID.
 
-Incorrect deployment reduces system guarantees.
+Ownership must be:
+
+- Explicit
+- Versioned
+- Conflict-detectable
+
+If ownership ambiguity is detected:
+
+Reject or terminate.
+
+Never allow dual-active binding.
 
 ---
 
-# Final Position
+# 5. Load Balancing Considerations
 
-Jumping VPN is not a plug-and-play tunnel.
+Load balancer must support:
 
-It is a session control layer
-that requires deliberate deployment.
+- Consistent hashing
+- Session stickiness
+- Low-latency routing
 
-Correct integration ensures:
+Not required:
 
-- Deterministic recovery
-- Bounded adaptation
-- Transparent observability
-- Controlled termination
+- Deep packet inspection
+- Session introspection
+
+The control-plane must remain gateway-bound.
+
+---
+
+# 6. Horizontal Scaling Strategy
+
+Scale by:
+
+- Increasing gateway instances
+- Sharding session ownership
+- Isolating per-session mutation
+
+Avoid:
+
+- Global locks
+- Shared mutable global state
+- Cross-session coupling
+
+Each session must be independently mutable.
+
+---
+
+# 7. Failure Domains
+
+Deployment must isolate:
+
+Gateway failure
+Transport failure
+Logging failure
+Session store failure
+Rate limiter overload
+
+Failure in one domain must not corrupt session state in another.
+
+Example:
+
+If logging pipeline fails:
+Session continues.
+Only telemetry degraded.
+
+---
+
+# 8. Rate Limiting Strategy
+
+Rate limiting may occur at:
+
+Client agent (local)
+Gateway (per session)
+Gateway (global)
+Edge firewall
+
+Rate limits must:
+
+- Be bounded
+- Be deterministic
+- Fail closed
+
+Flood must not cause uncontrolled switching.
+
+---
+
+# 9. Observability Deployment
+
+Observability must be:
+
+- Asynchronous
+- Non-blocking
+- Buffered
+- Backpressure-aware
+
+Recommended stack:
+
+- Structured logs
+- Event stream export
+- SIEM integration
+- Timeline viewer
+
+Protocol correctness must not depend on observability availability.
+
+---
+
+# 10. High-Volatility Environments
+
+Mobile networks
+Cross-border fintech
+Edge environments
+Satellite links
+
+Deployment requirements:
+
+- Short TTL bounds
+- Clear recovery deadlines
+- Tight anti-flap constraints
+- Explicit degraded state behavior
+
+Deployment must tune policy,
+not mutate protocol invariants.
+
+---
+
+# 11. Security Deployment Notes
+
+Production must include:
+
+- Hardened key management
+- Secure entropy source
+- Replay window enforcement
+- Version monotonicity validation
+- TLS or equivalent secure channel
+
+Control-plane must fail closed.
+
+Ambiguity must terminate session.
+
+---
+
+# 12. Production Safety Checklist
+
+Before declaring production readiness:
+
+- Reattach under loss tested
+- Reattach storm tested
+- Cluster ownership validated
+- Replay protection validated
+- Anti-flap behavior validated
+- Partition tolerance evaluated
+- Memory leak testing completed
+
+Deployment must prove invariants hold under stress.
+
+---
+
+# 13. What This Model Does Not Claim
+
+This document does NOT define:
+
+- Container orchestration
+- Cloud vendor specifics
+- Kubernetes configuration
+- CI/CD pipelines
+- OS-level tuning
+- Kernel offload strategies
+
+It defines behavioral safety boundaries only.
+
+---
+
+# 14. Operational Philosophy
+
+Deployment must preserve:
+
+Determinism over convenience.
+Consistency over availability.
+Explicit failure over silent corruption.
+
+Transport instability is expected.
+
+Identity ambiguity is unacceptable.
+
+---
+
+# Final Principle
+
+Deployment complexity may grow.
+
+Session identity must not.
+
+Session is the anchor.  
+Transport is volatile.
