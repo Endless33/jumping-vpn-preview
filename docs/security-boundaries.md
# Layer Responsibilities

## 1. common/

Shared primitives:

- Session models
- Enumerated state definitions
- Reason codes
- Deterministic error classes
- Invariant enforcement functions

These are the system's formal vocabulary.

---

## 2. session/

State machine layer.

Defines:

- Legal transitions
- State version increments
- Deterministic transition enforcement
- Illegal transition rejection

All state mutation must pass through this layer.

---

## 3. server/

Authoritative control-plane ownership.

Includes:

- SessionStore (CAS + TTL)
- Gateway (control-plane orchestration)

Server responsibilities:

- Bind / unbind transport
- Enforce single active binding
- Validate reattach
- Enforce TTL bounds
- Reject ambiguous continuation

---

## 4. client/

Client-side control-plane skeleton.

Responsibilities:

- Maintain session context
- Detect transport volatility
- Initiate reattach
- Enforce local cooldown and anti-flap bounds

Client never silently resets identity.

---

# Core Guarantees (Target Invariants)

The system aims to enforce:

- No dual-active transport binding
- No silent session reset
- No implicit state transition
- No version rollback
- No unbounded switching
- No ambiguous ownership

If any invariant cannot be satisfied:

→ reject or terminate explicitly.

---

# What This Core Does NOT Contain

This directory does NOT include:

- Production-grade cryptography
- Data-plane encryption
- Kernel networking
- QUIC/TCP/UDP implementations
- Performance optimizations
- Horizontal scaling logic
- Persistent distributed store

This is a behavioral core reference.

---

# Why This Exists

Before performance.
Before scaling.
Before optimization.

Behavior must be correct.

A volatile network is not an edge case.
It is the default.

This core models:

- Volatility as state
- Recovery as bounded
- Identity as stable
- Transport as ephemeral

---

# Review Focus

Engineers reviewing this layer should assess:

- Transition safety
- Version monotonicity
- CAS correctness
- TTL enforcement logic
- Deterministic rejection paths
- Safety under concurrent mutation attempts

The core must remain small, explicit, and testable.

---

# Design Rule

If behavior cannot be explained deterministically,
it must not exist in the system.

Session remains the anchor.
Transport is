@@ -1,0 +1,273 @@
+# Security Boundaries — Jumping VPN (Architectural Preview)
+
+This document defines the explicit security boundaries of the Jumping VPN model.
+
+It clarifies:
+
+- What the system is designed to protect
+- What it explicitly does not protect
+- Where trust boundaries exist
+- Where attack surface begins and ends
+
+This is a boundary definition — not a marketing statement.
+
+---
+
+# 1. Security Objective
+
+Primary objective:
+
+Preserve deterministic session identity
+under transport volatility
+without dual-active ambiguity.
+
+This is a continuity model,
+not an anonymity system.
+
+---
+
+# 2. Threat Assumptions
+
+The model assumes:
+
+- On-path adversaries can observe traffic
+- On-path adversaries can disrupt or drop packets
+- NAT churn and asymmetric routing are normal
+- Transport-level disruption is common
+- Control-plane may be targeted for reattach abuse
+
+The model does NOT assume:
+
+- Endpoint compromise
+- Hardware-level trust
+- Perfect network stability
+- Perfect clock synchronization
+
+---
+
+# 3. Trust Boundaries
+
+## 3.1 Client Boundary
+
+Trusted:
+
+- Local session identity
+- Local policy snapshot
+- Local nonce progression
+
+Untrusted:
+
+- Network transport
+- Path stability
+- Latency and loss metrics
+
+Client must never:
+
+- Assume stability
+- Silently reset identity
+- Allow unlimited switching
+
+---
+
+## 3.2 Server Boundary
+
+Trusted:
+
+- SessionStore authoritative state
+- CAS-protected version updates
+- TTL enforcement logic
+
+Untrusted:
+
+- Incoming reattach requests
+- Network metadata
+- Path origin
+
+Server must:
+
+- Validate proof-of-possession
+- Validate freshness
+- Enforce TTL bounds
+- Reject ambiguous continuation
+
+---
+
+## 3.3 Control-Plane Boundary
+
+Sensitive operations:
+
+- Session creation
+- Reattach validation
+- Transport binding
+- Session termination
+
+Control-plane must:
+
+- Fail closed
+- Reject on ambiguity
+- Never mutate state on partial validation
+- Emit reason-coded transitions
+
+---
+
+# 4. Attack Surface Overview
+
+## 4.1 Transport-Level Attacks
+
+Possible:
+
+- Packet loss injection
+- Latency inflation
+- Route manipulation
+- NAT rebinding
+
+Expected behavior:
+
+Transport death triggers RECOVERING.
+Session remains intact within TTL.
+
+Transport volatility alone must not hijack identity.
+
+---
+
+## 4.2 Replay / Reattach Hijack
+
+Mitigated by:
+
+- Proof-of-possession
+- Monotonic nonce
+- Freshness validation window
+- CAS-based version enforcement
+
+Replay must result in deterministic rejection.
+
+---
+
+## 4.3 Dual-Active Ambiguity
+
+Critical invariant:
+
+A session must never have two active transports simultaneously.
+
+Protection mechanisms:
+
+- Atomic bind
+- CAS update
+- Version monotonicity
+- Authoritative ownership model
+
+Ambiguous continuation is forbidden.
+
+---
+
+## 4.4 Reattach Flood / Control-Plane Abuse
+
+Mitigation targets:
+
+- Rate limits
+- Cooldown windows
+- Early rejection for unknown sessions
+- Bounded replay tracking
+
+Control-plane must not become a switching amplifier.
+
+---
+
+# 5. Explicit Non-Protection Areas
+
+Jumping VPN does NOT guarantee:
+
+- Anonymity (Tor-like protection)
+- Traffic obfuscation
+- Endpoint compromise resistance
+- Nation-state censorship bypass
+- Metadata concealment beyond transport abstraction
+- Protection against key exfiltration
+- Kernel-level hardening
+
+Scope is intentionally constrained.
+
+---
+
+# 6. Failure Containment Strategy
+
+If any boundary is violated:
+
+- Reject explicitly
+- Terminate deterministically
+- Emit reason-coded event
+
+Never:
+
+- silently continue
+- downgrade invisibly
+- assume partial success
+
+Correctness > Availability.
+
+---
+
+# 7. Cluster Boundary Considerations
+
+In multi-node deployments:
+
+Required:
+
+- Explicit ownership model
+- Sticky routing OR atomic shared state store
+- Versioned CAS updates
+
+Forbidden:
+
+- Eventual-consistency ambiguity for active binding
+- Dual-active reattach acceptance
+
+Consistency is preferred over split-brain availability.
+
+---
+
+# 8. Observability Boundary
+
+Observability must be:
+
+- Non-blocking
+- Side-effect free
+- Independent of correctness
+
+Failure of telemetry must not affect:
+
+- State transitions
+- Binding safety
+- TTL enforcement
+
+---
+
+# 9. Core Security Principle
+
+Transport volatility is expected.
+
+Security boundaries exist to prevent:
+
+- Identity hijack
+- Ambiguous continuation
+- Unbounded mutation
+- Silent reset
+
+The model is designed to make failure explicit.
+
+---
+
+# Final Statement
+
+Jumping VPN defines safety through:
+
+- Determinism
+- Explicit invariants
+- Bounded adaptation
+- Version-safe transitions
+- Clear trust boundaries
+
+Security is defined by what is explicitly constrained.
+
+Session is the anchor.
+Transport is volatile.
