@@ -1,119 +1,194 @@
-# Security Review Checklist — Jumping VPN (Preview)
+# Security Review Checklist — Jumping VPN
 
-This document defines the internal security review framework
-for validating Jumping VPN's behavioral guarantees.
+This checklist defines the minimum areas that must be reviewed
+before any production claim is made.
 
-This is not a marketing artifact.
-It is an engineering checklist.
+It is intended for:
 
----
+- Internal engineering review
+- External security auditors
+- Partner evaluation teams
 
-# 1. State Machine Validation
-
-☐ All transitions are deterministic  
-☐ No implicit state changes  
-☐ TERMINATED is absorbing  
-☐ Recovery windows are bounded  
-☐ No unbounded retry loops  
+This is not a marketing document.
+It is a review contract.
 
 ---
 
-# 2. Identity Binding Review
+## 1. Control-Plane Safety
 
-☐ SessionID is cryptographically bound  
-☐ Reattach requires proof-of-possession  
-☐ No session fixation vectors  
-☐ Identity cannot be reset silently  
-☐ Session TTL enforced  
+### 1.1 State Machine Integrity
 
----
+- [ ] All state transitions are explicit
+- [ ] No implicit state mutation paths exist
+- [ ] No silent session reset paths exist
+- [ ] State version is strictly monotonic
+- [ ] Stale state updates are rejected
 
-# 3. Transport Switching Controls
+### 1.2 Deterministic Failure Handling
 
-☐ MaxSwitchesPerMinute enforced  
-☐ Cooldown windows implemented  
-☐ Hysteresis for volatility detection  
-☐ Switch decisions are reason-coded  
-☐ No dual-active transport binding  
-
----
-
-# 4. Replay Protection
-
-☐ Reattach messages include freshness markers  
-☐ Replay window is bounded  
-☐ Duplicate reattach rejected deterministically  
-☐ Replay attempts logged  
+- [ ] Ambiguous ownership → reject or terminate
+- [ ] TTL expiration → deterministic termination
+- [ ] Transport-loss TTL enforced
+- [ ] Recovery window bounded by policy
+- [ ] No infinite retry loops possible
 
 ---
 
-# 5. Cluster Consistency
+## 2. Replay & Freshness Protection
 
-☐ Authoritative ownership model defined  
-☐ CAS-based atomic update model  
-☐ Split-brain rejection behavior tested  
-☐ No ambiguous continuation allowed  
-☐ Consistency preferred over availability  
+- [ ] Monotonic client nonce enforced
+- [ ] Replay window bounded
+- [ ] Nonce reuse rejected deterministically
+- [ ] Freshness validated before transport binding
+- [ ] Reattach proof cryptographically bound to session
+- [ ] Anti-replay data structures bounded in memory
 
----
-
-# 6. Session Table Hardening
-
-☐ Per-session resource bounds  
-☐ TTL-based eviction  
-☐ Rate limits per identity  
-☐ No unbounded memory growth  
+Preview-only logic must not be mistaken for production crypto.
 
 ---
 
-# 7. Observability Safety
+## 3. Dual Binding Prevention
 
-☐ All state transitions emit events  
-☐ Audit events are explicit  
-☐ Logging failure does not affect protocol correctness  
-☐ Telemetry cannot mutate state  
+- [ ] Single active transport invariant enforced
+- [ ] No race condition allows dual-active state
+- [ ] Versioned ownership prevents rollback
+- [ ] Split-brain scenario tested
+- [ ] CAS / atomic update verified (cluster mode)
 
----
-
-# 8. Failure Handling
-
-☐ Transport death handled deterministically  
-☐ Policy-limit exceedance handled explicitly  
-☐ Security violation triggers termination  
-☐ No undefined “zombie” sessions  
+Zero tolerance for dual identity binding.
 
 ---
 
-# 9. Benchmark Validation
+## 4. Rate Limiting & Abuse Protection
 
-☐ RecoveryLatencyMs measured  
-☐ SwitchRate measured  
-☐ SessionResetCount validated = 0 under bounded volatility  
-☐ DualBindingIncidents validated = 0  
+- [ ] Reattach rate limit per session
+- [ ] Global control-plane rate limit
+- [ ] Cooldown enforcement
+- [ ] DoS attempt simulation performed
+- [ ] No unbounded memory growth under flood
+- [ ] Retry-after semantics deterministic
 
----
-
-# 10. Explicit Non-Goals Confirmed
-
-☐ No anonymity guarantees claimed  
-☐ No censorship bypass guarantees claimed  
-☐ No endpoint security claims made  
-☐ Scope limited to transport volatility modeling  
+Control-plane must not amplify attack surface.
 
 ---
 
-# Review Philosophy
+## 5. Cryptographic Guarantees (Production Requirement)
 
-If a property cannot be:
+- [ ] Authenticated encryption (AEAD)
+- [ ] Forward secrecy
+- [ ] Rekey strategy defined
+- [ ] Downgrade attack resistance
+- [ ] Key lifecycle documented
+- [ ] Key rotation under transport change defined
+- [ ] Cryptographic audit completed
 
-- Measured
-- Bounded
-- Logged
-- Audited
-
-It is not considered secure.
+Preview repository does not fulfill this section.
 
 ---
+
+## 6. Data Plane Boundaries
+
+- [ ] Clear separation of control-plane vs data-plane
+- [ ] No control-plane decision depends on packet payload
+- [ ] Packet framing validated
+- [ ] No parsing ambiguity in control messages
+- [ ] Reject malformed control messages deterministically
+
+---
+
+## 7. Observability Safety
+
+- [ ] Logging is non-blocking
+- [ ] Logging failure does not affect session correctness
+- [ ] State transitions logged before external emission
+- [ ] Sensitive material never logged in plaintext
+- [ ] Audit events structured and reason-coded
+
+---
+
+## 8. Memory & Resource Safety
+
+- [ ] Session store bounded
+- [ ] Replay window bounded
+- [ ] Rate limiter memory bounded
+- [ ] No unbounded candidate transport growth
+- [ ] Expired sessions evicted deterministically
+- [ ] No memory leak under churn test
+
+---
+
+## 9. Failure Injection Coverage
+
+Tested scenarios:
+
+- [ ] Packet loss spike
+- [ ] NAT rebinding
+- [ ] Path oscillation
+- [ ] Reattach flood
+- [ ] Split-brain attempt
+- [ ] Node crash during reattach
+- [ ] TTL expiration under load
+
+All failures must produce explicit transitions.
+
+---
+
+## 10. Policy Safety
+
+- [ ] Policy parameters documented
+- [ ] Safe defaults defined
+- [ ] MaxSwitchesPerMinute bounded
+- [ ] Recovery window bounded
+- [ ] Policy misconfiguration fails closed
+
+---
+
+## 11. Threat Model Alignment
+
+- [ ] On-path attacker assumption validated
+- [ ] Disruption does not imply identity takeover
+- [ ] Replay does not mutate state
+- [ ] Ownership ambiguity cannot escalate privilege
+- [ ] Control-plane cannot be used for amplification
+
+---
+
+## 12. Non-Goals Confirmed
+
+Reviewers must confirm that the system does NOT claim:
+
+- Anonymity guarantees
+- Censorship bypass guarantees
+- Endpoint compromise protection
+- Traffic obfuscation guarantees
+- Kernel-level invisibility
+
+Claims must match documented scope.
+
+---
+
+## 13. Review Sign-Off
+
+Before production release:
+
+- [ ] Internal engineering sign-off
+- [ ] External security review completed
+- [ ] Benchmark evidence recorded
+- [ ] No open critical vulnerabilities
+- [ ] Documentation consistent with implementation
+
+Production claims without completed checklist
+must be considered invalid.
+
+---
+
+## Final Principle
 
 Security is not a feature.
-It is constrained, deterministic behavior under pressure.
+It is a constraint.
+
+If a guarantee cannot be upheld,
+the session must terminate explicitly.
+
+Session is the anchor.  
+Transport is volatile.
