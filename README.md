@@ -238,3 +238,12 @@ not as fatal error.
 **Session remains the anchor.  
 Transports come and go.**
 ```0
+
+## Intellectual Property Notice
+
+This repository is published for architectural validation and review only.
+
+Core implementation details, production cryptography,
+and deployment logic remain private.
+
+No license is granted for reproduction or commercial use.
