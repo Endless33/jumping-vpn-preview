@@ -1,13 +1,13 @@
 # 🧬 Jumping VPN — Architectural Preview
 
-Jumping VPN is a session-centric VPN architecture designed for environments where transport volatility is the default state of the network.
+Jumping VPN is a **session-centric VPN architecture** designed for environments where **transport volatility** is the default state of the network.
 
 Traditional VPN systems often assume transport stability.  
 Jumping VPN assumes instability — and models it explicitly.
 
-This repository contains architectural documentation, behavioral models, and minimal proof-of-concept prototypes.
+This repository contains **architectural documentation**, **behavioral models**, and **minimal proof-of-concept prototypes**.
 
-It is not a production release.
+It is **not** a production release.
 
 ---
 
@@ -34,11 +34,11 @@ Transport death does not imply session death (within defined bounds).
 
 ## 🧠 Architectural Model
 
-Jumping VPN is defined by behavior over time.
+Jumping VPN is defined by **behavior over time**.
 
 ### Session-Centric Identity
 
-The session is the source of truth.
+The session is the source of truth:
 
 - Identity belongs to the session
 - Transport is an attachment
@@ -48,11 +48,11 @@ The session is the source of truth.
 
 Transport failover is:
 
-- explicit  
-- policy-bounded  
-- rate-limited  
-- logged  
-- auditable  
+- explicit
+- policy-bounded
+- rate-limited
+- logged
+- auditable
 
 No silent renegotiation.  
 No uncontrolled session resets.
@@ -74,34 +74,10 @@ Transitions are deterministic and reason-coded.
 
 ## 📂 Repository Structure
 
-```
-.
-├── docs/
-│   ├── MutationLogs/
-│   ├── architecture-overview.md
-│   ├── state-machine.md
-│   ├── invariants.md
-│   ├── non-goals.md
-│   ├── comparison-model.md
-│   ├── threat-model.md
-│   ├── design-decisions.md
-│   ├── limitations.md
-│   ├── use-case-fintech-failover.md
-│   ├── test-scenarios.md
-│   ├── roadmap.md
-│   └── security-review-plan.md
-├── spec/
-│   └── vrp-preview.md
-└── poc/
-    ├── demo.py
-    ├── session.py
-    ├── transport.py
-    ├── policy.py
-    ├── logger.py
-    ├── real_udp_prototype.py
-    ├── README.md
-    └── README_udp.md
-```
+. ├── docs/ │   ├── index.md │   ├── reviewer-guide.md │   ├── architecture-overview.md │   ├── architecture-overview.md │   ├── state-machine.md │   ├── invariants.md │   ├── formal-invariants-machine.md │   ├── formal-spec-outline.md │   ├── formal-properties.md │   ├── security-boundary.md │   ├── security-boundary-model.md │   ├── security-model-deep-dive.md │   ├── threat-model.md │   ├── attack-scenarios.md │   ├── control-plane-sequence.md │   ├── performance-model.md │   ├── benchmark-plan.md │   ├── integration-evaluation.md │   ├── production-readiness-checklist.md │   ├── production-readiness-gap.md │   ├── protocol-rationale.md │   ├── comparative-analysis.md │   ├── whitepaper-draft.md │   ├── design-decisions.md │   ├── limitations.md │   ├── non-goals.md │   ├── comparison-model.md │   ├── use-case-fintech-failover.md │   ├── test-scenarios.md │   ├── roadmap.md │   ├── reason-codes.md │   ├── security-review-plan.md │   └── MutationLogs/ ├── spec/ │   └── vrp-preview.md ├── poc/ │   ├── demo.py │   ├── session.py │   ├── transport.py │   ├── policy.py │   ├── logger.py │   ├── real_udp_prototype.py │   ├── README.md │   └── README_udp.md └── core/ └── README.md
+
+> Note: `core/` is a **production-oriented skeleton** (control-plane structure),
+> intended to encode invariants and module boundaries in code.
 
 ---
 
@@ -143,9 +119,10 @@ Jumping VPN explicitly defines:
 - deterministic failure boundaries
 - bounded adaptation policies
 
-See:
+Recommended:
 
 - `docs/threat-model.md`
+- `docs/security-boundary.md`
 - `docs/invariants.md`
 - `docs/state-machine.md`
 - `docs/security-review-plan.md`
@@ -169,6 +146,7 @@ Scope is intentionally constrained to:
 See:
 
 - `docs/non-goals.md`
+- `docs/limitations.md`
 
 ---
 
@@ -185,7 +163,7 @@ The following areas remain under exploration:
 These are not omissions.  
 They are active research directions.
 
-This repository prioritizes behavioral correctness
+This repository prioritizes **behavioral correctness**
 over feature completeness.
 
 ---
@@ -224,7 +202,7 @@ It requires rigor.
 
 ## 📈 Status
 
-Jumping VPN is currently in architectural validation phase.
+Jumping VPN is currently in **architectural validation** phase.
 
 This repository:
 
@@ -244,7 +222,7 @@ Open to technical discussions with teams exploring:
 - session persistence under volatility
 - operator-grade observability for adaptive systems
 
-📧 Contact: riabovasvitalijus@gmail.com
+📧 Contact: **riabovasvitalijus@gmail.com**
 
 ---
 
@@ -259,3 +237,4 @@ not as fatal error.
 
 **Session remains the anchor.  
 Transports come and go.**
+```0
