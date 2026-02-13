@@ -1,146 +1,159 @@
-# Jumping VPN — Limitations (Public Preview)
+# Jumping VPN — Explicit Limitations
 
-This document outlines known limitations and explicit non-guarantees
-of the Jumping VPN architecture.
+Status: Architectural Scope Definition
 
-Clarity of limitations is essential for responsible deployment.
+This document defines what Jumping VPN does NOT attempt to solve.
 
----
-
-## 1. No Endpoint Compromise Protection
-
-Jumping VPN does not protect against:
-
-- Malware on the client device
-- Compromised operating systems
-- Rooted or jailbroken environments
-- Malicious local administrators
-
-If the endpoint is compromised,
-session continuity guarantees are irrelevant.
+Clear boundaries increase trust.
+Undefined ambition decreases it.
 
 ---
 
-## 2. No Absolute Anonymity Guarantee
+# 1. Not a Transport Replacement
 
-Jumping VPN does not claim:
+Jumping VPN does NOT:
 
-- Tor-level anonymity
-- Protection against global passive adversaries
-- Guaranteed metadata elimination
-- Untraceability across multiple independent networks
+- Replace QUIC
+- Replace TCP congestion control
+- Replace kernel-level routing
+- Optimize raw throughput
 
-Anonymity requires separate infrastructure layers.
-
----
-
-## 3. No Physical Layer Control
-
-The protocol does not control:
-
-- Radio interference
-- ISP throttling
-- Total network blackout
-- Physical cable disruptions
-
-If no viable transport exists,
-the session must terminate.
+It operates above volatile transport bindings.
 
 ---
 
-## 4. Requires At Least One Viable Transport
+# 2. Not an Anonymity Network
 
-Jumping VPN preserves session continuity
-only if at least one candidate transport is available.
+Jumping VPN does NOT:
 
-If all transports are dead beyond policy bounds,
-termination is deterministic.
+- Guarantee anonymity
+- Hide traffic volume patterns
+- Obfuscate traffic fingerprinting by itself
+- Replace Tor or mixnets
 
----
-
-## 5. Performance Trade-Offs
-
-Explicit transport switching and bounded adaptation may introduce:
-
-- Slight recovery latency
-- Additional control-plane overhead
-- Increased logging output
-- Policy-driven switching delays
-
-These are intentional trade-offs for predictability and auditability.
+It preserves session continuity.
+It does not provide anonymity guarantees.
 
 ---
 
-## 6. Not a Censorship Bypass System
+# 3. Not a DDoS Shield
 
-Jumping VPN does not inherently:
+Jumping VPN does NOT:
 
-- Evade state-level DPI
-- Obfuscate traffic fingerprints
-- Guarantee bypass of national firewalls
+- Absorb volumetric DDoS traffic
+- Replace CDN-based mitigation
+- Replace edge filtering infrastructure
 
-Additional obfuscation layers would be required.
-
----
-
-## 7. Not Designed for Ultra-Low-Latency Trading
-
-The architecture prioritizes:
-
-- Deterministic behavior
-- Recovery guarantees
-- Policy compliance
-
-It is not optimized for microsecond-level trading systems.
+Transport switching may mitigate some localized disruption,
+but it is not a DDoS protection system.
 
 ---
 
-## 8. Cryptographic Details Not Public in Preview
+# 4. Not a Cryptographic Reinvention
 
-This repository does not expose:
+Jumping VPN does NOT:
 
-- Key exchange algorithms
-- Exact cryptographic primitives
-- Reattachment proof structures
+- Invent new cryptographic primitives
+- Replace TLS
+- Replace proven key exchange algorithms
+- Claim quantum resistance
 
-Security-critical implementation details are staged
-for hardened release and review.
-
----
-
-## 9. No Promise of Perpetual Continuity
-
-Session continuity is bounded by:
-
-- Policy constraints
-- Session lifetime limits
-- Inactivity timeouts
-- Security violation triggers
-
-If limits are exceeded, termination is explicit.
+It relies on hardened, existing cryptographic standards.
 
 ---
 
-## 10. Early-Stage Architectural Preview
+# 5. Not Unlimited Adaptation
 
-This repository represents:
+The system is intentionally bounded:
 
-- Behavioral modeling
-- Architectural direction
-- Early PoC demonstration
+- Switch rate is limited.
+- Recovery window is finite.
+- Session lifetime is capped.
+- Transportless state is temporary.
 
-It does not represent a production-hardened release.
-
-Security reviews, stress testing, and formal validation
-remain future phases.
+Unbounded adaptation is instability.
 
 ---
 
-## Final Note
+# 6. Not Zero-Overhead
 
-Jumping VPN does not attempt to solve every networking problem.
+Switching and observability introduce:
 
-It addresses one core challenge:
+- Additional state tracking
+- Logging overhead
+- Decision evaluation cost
 
-Preserving session integrity under transport volatility —
-within explicit, bounded rules.
+This is a trade-off for deterministic recovery.
+
+---
+
+# 7. Not Immune to Total Blackout
+
+If:
+
+- No transport exists
+- Recovery window expires
+- Session TTL exceeded
+
+The session terminates.
+
+No protocol survives complete physical disconnection indefinitely.
+
+---
+
+# 8. Not a Marketing Claim
+
+Jumping VPN does NOT claim:
+
+- Infinite uptime
+- Perfect resilience
+- Unbreakable security
+- Zero latency
+
+It claims:
+
+Deterministic behavior under volatility.
+
+---
+
+# 9. Not a Universal Replacement
+
+It may not be needed if:
+
+- Your environment is stable.
+- Failover events are rare.
+- QUIC migration already solves your problem.
+- Identity continuity across transport is not critical.
+
+In such cases, simpler systems may be preferable.
+
+---
+
+# 10. Scope Boundary Summary
+
+Jumping VPN provides:
+
+- Session-centric continuity
+- Bounded adaptation
+- Deterministic recovery
+- Explicit degradation modeling
+- Operator-grade observability
+
+It does NOT provide:
+
+- Throughput optimization
+- Anonymity guarantees
+- DDoS protection
+- Infinite recovery
+
+---
+
+# Final Position
+
+This system exists to solve one problem well:
+
+How to preserve session identity under transport volatility
+without uncontrolled renegotiation or silent resets.
+
+Nothing more.
+Nothing less.
