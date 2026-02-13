@@ -1,126 +1,68 @@
 """
-Policy Engine — Jumping VPN (Preview)
+Policy Engine — Deterministic Recovery Control
 
-Deterministic policy evaluation for transport volatility.
+Defines bounded adaptation rules for transport switching,
+degradation handling, and termination decisions.
 
-This module decides:
-- when quality is considered VOLATILE
-- when transport is considered DEAD
-- when switching is allowed
-- when degradation/termination should occur
-
-No heuristics, no randomness.
+This module does NOT perform networking.
+It enforces policy constraints on session state transitions.
 """
 
 from dataclasses import dataclass
 from typing import Optional
+import time
 
 
-@dataclass(frozen=True)
-class QualitySample:
-    """
-    Transport quality signal snapshot.
-    Values are unit-annotated and expected to be precomputed by adapters.
-    """
-    loss_pct: float          # 0..100
-    rtt_ms: int              # >=0
-    jitter_ms: int           # >=0
-    consecutive_drops: int   # >=0
-    last_ok_ms: int          # timestamp of last confirmed delivery
-    now_ms: int              # current timestamp
+@dataclass
+class PolicyConfig:
+    max_switches_per_minute: int = 5
+    recovery_window_ms: int = 5000
+    transport_loss_ttl_ms: int = 8000
+    max_consecutive_failures: int = 3
 
 
-@dataclass(frozen=True)
-class PolicyDecision:
-    """
-    Deterministic decision output.
-    """
-    is_volatile: bool
-    is_dead: bool
-    should_switch: bool
-    reason: str
+class PolicyViolation(Exception):
+    pass
 
 
 class PolicyEngine:
     """
-    Evaluates policy thresholds and returns deterministic decisions.
+    Enforces bounded adaptation rules.
     """
 
-    def __init__(
-        self,
-        *,
-        max_consecutive_drops: int = 3,
-        degrade_after_ms: int = 1500,
-        volatile_loss_pct: float = 5.0,
-        volatile_rtt_ms: int = 250,
-        volatile_jitter_ms: int = 80,
-        switch_cooldown_ms: int = 750,
-    ):
-        self.max_consecutive_drops = max_consecutive_drops
-        self.degrade_after_ms = degrade_after_ms
+    def __init__(self, config: Optional[PolicyConfig] = None):
+        self.config = config or PolicyConfig()
+        self._switch_timestamps = []
+        self._consecutive_failures = 0
 
-        self.volatile_loss_pct = volatile_loss_pct
-        self.volatile_rtt_ms = volatile_rtt_ms
-        self.volatile_jitter_ms = volatile_jitter_ms
+    def record_switch(self):
+        now = time.time()
+        self._switch_timestamps.append(now)
+        self._cleanup_old_switches(now)
 
-        self.switch_cooldown_ms = switch_cooldown_ms
+        if len(self._switch_timestamps) > self.config.max_switches_per_minute:
+            raise PolicyViolation("Switch rate exceeded (anti-flap triggered)")
 
-    # ---------------------------------------------------------
-    # Deterministic Evaluation
-    # ---------------------------------------------------------
+    def record_failure(self):
+        self._consecutive_failures += 1
+        if self._consecutive_failures >= self.config.max_consecutive_failures:
+            raise PolicyViolation("Too many consecutive transport failures")
 
-    def evaluate(
-        self,
-        sample: QualitySample,
-        *,
-        last_switch_ms: Optional[int],
-        has_candidate_transport: bool
-    ) -> PolicyDecision:
-        """
-        Deterministically evaluate volatility/death/switch eligibility.
+    def reset_failures(self):
+        self._consecutive_failures = 0
 
-        - is_dead: hard failure signal
-        - is_volatile: soft failure signal
-        - should_switch: only if candidate exists and cooldown allows
-        """
+    def check_recovery_window(self, recovery_start_ts_ms: int):
+        now_ms = int(time.time() * 1000)
+        if now_ms - recovery_start_ts_ms > self.config.recovery_window_ms:
+            raise PolicyViolation("Recovery window exceeded")
 
-        # Hard failure: too many consecutive drops OR no successful delivery for too long
-        time_since_ok = max(0, sample.now_ms - sample.last_ok_ms)
+    def check_transport_loss_ttl(self, last_transport_alive_ms: int):
+        now_ms = int(time.time() * 1000)
+        if now_ms - last_transport_alive_ms > self.config.transport_loss_ttl_ms:
+            raise PolicyViolation("Transport-loss TTL expired")
 
-        is_dead = (
-            sample.consecutive_drops >= self.max_consecutive_drops
-            or time_since_ok >= self.degrade_after_ms
-        )
-
-        # Soft failure: quality violations (loss/latency/jitter)
-        is_volatile = (
-            sample.loss_pct >= self.volatile_loss_pct
-            or sample.rtt_ms >= self.volatile_rtt_ms
-            or sample.jitter_ms >= self.volatile_jitter_ms
-        )
-
-        # Switch gating (deterministic cooldown)
-        cooldown_ok = True
-        if last_switch_ms is not None:
-            cooldown_ok = (sample.now_ms - last_switch_ms) >= self.switch_cooldown_ms
-
-        should_switch = bool(has_candidate_transport and cooldown_ok and (is_dead or is_volatile))
-
-        # Reason codes (human-readable; map to ReasonCode enums elsewhere if needed)
-        if is_dead and should_switch:
-            reason = "TRANSPORT_DEAD_SWITCH_ALLOWED"
-        elif is_dead and not should_switch:
-            reason = "TRANSPORT_DEAD_NO_SWITCH_AVAILABLE"
-        elif is_volatile and should_switch:
-            reason = "QUALITY_VOLATILE_SWITCH_ALLOWED"
-        elif is_volatile and not should_switch:
-            reason = "QUALITY_VOLATILE_SWITCH_COOLDOWN_OR_NO_CANDIDATE"
-        else:
-            reason = "QUALITY_OK"
-
-        return PolicyDecision(
-            is_volatile=is_volatile,
-            is_dead=is_dead,
-            should_switch=should_switch,
-            reason=reason
-        )
+    def _cleanup_old_switches(self, now: float):
+        self._switch_timestamps = [
+            ts for ts in self._switch_timestamps
+            if now - ts < 60
+        ]
