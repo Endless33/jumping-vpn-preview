@@ -1,211 +1,119 @@
-# Jumping VPN — Security Review Checklist (Public Preview)
+# Security Review Checklist — Jumping VPN (Preview)
 
-Status: Architectural Validation
+This document defines the internal security review framework
+for validating Jumping VPN's behavioral guarantees.
 
-This document outlines the security assumptions,
-attack surfaces, and review checkpoints
-for Jumping VPN's session-centric architecture.
-
-This is not a marketing document.
-It is a structured review baseline.
+This is not a marketing artifact.
+It is an engineering checklist.
 
 ---
 
-# 1. Threat Model Assumptions
+# 1. State Machine Validation
 
-The system assumes:
-
-- The attacker can observe transport-level traffic.
-- The attacker can induce packet loss.
-- The attacker can force path degradation.
-- The attacker can attempt replay of reattach messages.
-- The attacker may attempt session hijacking during volatility.
-- NAT mappings may expire unpredictably.
-
-The system does NOT assume:
-
-- Stable IP addresses.
-- Honest transport conditions.
-- Reliable packet delivery.
+☐ All transitions are deterministic  
+☐ No implicit state changes  
+☐ TERMINATED is absorbing  
+☐ Recovery windows are bounded  
+☐ No unbounded retry loops  
 
 ---
 
-# 2. Attack Surfaces Introduced by Volatility
+# 2. Identity Binding Review
 
-Transport volatility increases:
-
-- Reattach attempts
-- Identity binding transitions
-- Transport rebinding operations
-
-Each transition must be secured.
-
-Review questions:
-
-- Is reattach proof cryptographically bound to session identity?
-- Is reattach bound to previous cryptographic context?
-- Are replay attempts bounded by nonce/window?
-- Is downgrade attack possible during RECOVERING?
+☐ SessionID is cryptographically bound  
+☐ Reattach requires proof-of-possession  
+☐ No session fixation vectors  
+☐ Identity cannot be reset silently  
+☐ Session TTL enforced  
 
 ---
 
-# 3. Session Integrity Controls
+# 3. Transport Switching Controls
 
-Security reviewers must verify:
-
-- SessionID cannot be guessed or enumerated.
-- Reattach requires proof-of-possession of session keys.
-- Session fixation is impossible.
-- No implicit identity reset occurs during switch.
-- Transport binding includes integrity validation.
+☐ MaxSwitchesPerMinute enforced  
+☐ Cooldown windows implemented  
+☐ Hysteresis for volatility detection  
+☐ Switch decisions are reason-coded  
+☐ No dual-active transport binding  
 
 ---
 
 # 4. Replay Protection
 
-Checklist:
-
-- Is there a bounded replay window?
-- Are reattach messages nonce-protected?
-- Is timestamp validation enforced?
-- Can an attacker replay an old successful reattach?
-
-If yes → FAIL.
+☐ Reattach messages include freshness markers  
+☐ Replay window is bounded  
+☐ Duplicate reattach rejected deterministically  
+☐ Replay attempts logged  
 
 ---
 
-# 5. Transport Hijacking Risk
+# 5. Cluster Consistency
 
-Scenario:
-Attacker observes volatility and injects fake reattach.
-
-Required guarantees:
-
-- Strong cryptographic binding between:
-  SessionID
-  Identity
-  Active keys
-- Reattach must fail without valid key material.
-
-Reviewer question:
-Can an attacker bind a new transport without session keys?
-
-If yes → FAIL.
+☐ Authoritative ownership model defined  
+☐ CAS-based atomic update model  
+☐ Split-brain rejection behavior tested  
+☐ No ambiguous continuation allowed  
+☐ Consistency preferred over availability  
 
 ---
 
-# 6. Volatility Abuse (Flapping Attack)
+# 6. Session Table Hardening
 
-Scenario:
-Attacker induces artificial loss to force repeated switching.
-
-Required defenses:
-
-- MAX_SWITCHES_PER_MIN
-- SWITCH_COOLDOWN_MS
-- Degradation state modeling
-- Explicit switch denial
-
-Reviewer question:
-Can switching be triggered unboundedly?
-
-If yes → FAIL.
+☐ Per-session resource bounds  
+☐ TTL-based eviction  
+☐ Rate limits per identity  
+☐ No unbounded memory growth  
 
 ---
 
-# 7. Resource Exhaustion
+# 7. Observability Safety
 
-Scenario:
-Repeated volatility triggers cause state churn.
-
-Required controls:
-
-- Bounded recovery window
-- Candidate transport limit
-- Memory bounded by session policy
-- Hard TTL on transportless state
-
-Reviewer question:
-Can attacker cause unbounded memory growth?
-
-If yes → FAIL.
+☐ All state transitions emit events  
+☐ Audit events are explicit  
+☐ Logging failure does not affect protocol correctness  
+☐ Telemetry cannot mutate state  
 
 ---
 
-# 8. Session Lifecycle Boundaries
+# 8. Failure Handling
 
-Checklist:
-
-- Is session lifetime bounded?
-- Are expired sessions fully invalidated?
-- Is state cleaned deterministically?
-- Is key rotation tied to session policy?
+☐ Transport death handled deterministically  
+☐ Policy-limit exceedance handled explicitly  
+☐ Security violation triggers termination  
+☐ No undefined “zombie” sessions  
 
 ---
 
-# 9. Observability & Audit
+# 9. Benchmark Validation
 
-Security requirement:
-
-Every state transition MUST produce:
-
-- timestamp
-- session_id
-- reason_code
-- previous_state
-- new_state
-
-Reviewer question:
-Can SOC reconstruct a session timeline?
-
-If no → FAIL.
+☐ RecoveryLatencyMs measured  
+☐ SwitchRate measured  
+☐ SessionResetCount validated = 0 under bounded volatility  
+☐ DualBindingIncidents validated = 0  
 
 ---
 
-# 10. Non-Goals (Security Scope Clarity)
+# 10. Explicit Non-Goals Confirmed
 
-Jumping VPN does NOT attempt to:
-
-- Replace TLS
-- Replace application-layer encryption
-- Guarantee anonymity by itself
-- Replace firewall policy
-- Hide traffic volume patterns
-
-Security review must evaluate it strictly
-as a behavioral session layer.
+☐ No anonymity guarantees claimed  
+☐ No censorship bypass guarantees claimed  
+☐ No endpoint security claims made  
+☐ Scope limited to transport volatility modeling  
 
 ---
 
-# 11. Red Team Checklist
+# Review Philosophy
 
-Questions a red team should attempt to answer:
+If a property cannot be:
 
-- Can we hijack during RECOVERING?
-- Can we force silent identity reset?
-- Can we bypass switch rate limits?
-- Can we replay an old reattach?
-- Can we cause split-brain session state?
-- Can we cause session to remain ATTACHED when transport is dead?
+- Measured
+- Bounded
+- Logged
+- Audited
 
-Any positive answer → design revision required.
+It is not considered secure.
 
 ---
 
-# Final Statement
-
-Adaptation increases complexity.
-
-Complexity increases attack surface.
-
-Jumping VPN explicitly models both.
-
-Security must validate:
-
-- bounded behavior
-- deterministic transitions
-- cryptographic binding
-- explicit termination
-
-Volatility is not a feature.
-It is a liability unless formally constrained.
+Security is not a feature.
+It is constrained, deterministic behavior under pressure.
