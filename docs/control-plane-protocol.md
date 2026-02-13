@@ -1,7 +1,6 @@
 # Control Plane Protocol — Behavioral Contract (Preview)
 
-This document defines the abstract control-plane protocol
-used by Jumping VPN for session lifecycle management.
+This document defines the abstract control-plane protocol used by Jumping VPN.
 
 It specifies:
 
@@ -12,29 +11,28 @@ It specifies:
 - Rejection rules
 
 This is a behavioral contract.
-It does not define packet encryption or framing.
+It does NOT define encryption, framing, or packet formats.
 
 ---
 
-# 1. Design Goals
+## 1. Design Goals
 
 The control-plane must guarantee:
 
 - Explicit state transitions
 - Bounded recovery
 - Version-safe mutation
-- Deterministic rejection on ambiguity
+- Deterministic rejection
 - Single active transport binding
 
 The protocol must fail closed.
 
 ---
 
-# 2. Message Envelope
+## 2. Message Envelope
 
-All control-plane messages follow this envelope:
+All messages follow this structure:
 
-```json
 {
   "ts_ms": 1700000000000,
   "message_type": "STRING",
@@ -43,29 +41,23 @@ All control-plane messages follow this envelope:
   "payload": {}
 }
 
-Field definitions:
-Field
-Required
-Description
-ts_ms
-yes
-Unix timestamp (ms)
-message_type
-yes
-Message classification
-session_id
-yes
-Stable session identity
-state_version
-yes
-Monotonic state version
-payload
-yes
-Message-specific content
-3. Core Message Types
-3.1 HANDSHAKE_INIT
-Client → Server
-Purpose: Create new session.
+Field meanings:
+
+ts_ms — Unix timestamp (ms)  
+message_type — classification  
+session_id — stable identity  
+state_version — monotonic counter  
+payload — message-specific content  
+
+---
+
+## 3. Core Messages
+
+### HANDSHAKE_INIT
+
+Client → Server  
+Purpose: create session
+
 Payload:
 
 {
@@ -73,34 +65,32 @@ Payload:
   "requested_policy": {}
 }
 
-Server response:
-HANDSHAKE_ACK
-SESSION_CREATED
-3.2 HANDSHAKE_ACK
-Server → Client
-Payload:
+Server replies:
 
-{
-  "assigned_session_id": "abc123",
-  "policy_snapshot": {},
-  "initial_state_version": 0
-}
+HANDSHAKE_ACK  
+SESSION_CREATED  
 
-Transition
+Transition:
 
 BIRTH → ATTACHED
 
-3.3 TRANSPORT_DEAD (Signal)
-Internal or Client-triggered.
-Purpose: Declare current transport unusable.
+---
+
+### TRANSPORT_DEAD
+
+Signal: transport unusable
+
 Transition:
 
 ATTACHED → RECOVERING
 
 Must increment state_version.
-3.4 REATTACH_REQUEST
+
+---
+
+### REATTACH_REQUEST
+
 Client → Server
-Payload:
 
 {
   "nonce": 42,
@@ -113,94 +103,101 @@ Payload:
   }
 }
 
-Server must validate:
-session exists
-TTL not expired
-proof-of-possession valid
-nonce freshness valid
-no dual-active conflict
-version matches expected
-Possible outcomes:
-REATTACH_ACK
-REATTACH_REJECT
-3.5 REATTACH_ACK
-Server → Client
-Payload:
+Server validates:
 
-{
-  "new_state_version": 13,
-  "reason": "REATTACH_SUCCESS"
-}
+- session exists
+- TTL valid
+- proof valid
+- nonce fresh
+- no dual-active conflict
+- state_version matches
 
-Transition:
+Possible responses:
+
+REATTACH_ACK  
+REATTACH_REJECT  
+
+---
+
+### REATTACH_ACK
 
 RECOVERING → ATTACHED
 
-3.6 REATTACH_REJECT
-Server → Client
-Payload:
+Must bind transport atomically.
 
-{
-  "reason": "TTL_EXPIRED"
-}
+---
 
-Possible transitions:
+### REATTACH_REJECT
 
-RECOVERING → DEGRADED
-RECOVERING → TERMINATED
+RECOVERING → DEGRADED  
+or  
+RECOVERING → TERMINATED  
 
-Never silent continuation.
-3.7 TERMINATE
-Server or Client-triggered.
-Payload:
+Rejection must be explicit.
 
-{
-  "reason": "SESSION_TTL_EXPIRED"
-}
+---
 
-Transition:
+### TERMINATE
 
 ANY → TERMINATED
 
 Termination is final.
-4. Version Semantics
+
+---
+
+## 4. Version Semantics
+
 Every successful transition:
-Must increment state_version
-Must reject stale state_version updates
-Must use CAS logic server-side
-Version rollback is forbidden.
-5. Deterministic Rejection Rules
-Server MUST reject if:
-state_version mismatch
-proof-of-possession invalid
-nonce replay detected
-TTL expired
-dual-active binding attempt
-ownership ambiguity detected
-Rejection must be explicit and reason-coded.
-6. Replay Protection Model (Preview)
-Monotonic client nonce
-Server-side replay window
-Reject stale nonce
-Reject reused nonce
-Freshness must be enforced before binding.
-7. Failure Behavior
-Transport-level failure: → RECOVERING
-TTL expiration: → TERMINATED
-Ambiguous ownership: → REJECT or TERMINATE
+
+- increments state_version
+- rejects stale versions
+- prevents rollback
+
+Rollback is forbidden.
+
+---
+
+## 5. Deterministic Rejection
+
+Server must reject if:
+
+- state_version mismatch
+- invalid proof
+- nonce replay
+- TTL expired
+- dual-active binding attempt
+- ownership ambiguity
+
+Rejection must be reason-coded.
+
+---
+
+## 6. Replay Protection
+
+- Monotonic client nonce
+- Server replay window
+- Reject reused nonce
+- Freshness validated before binding
+
+---
+
+## 7. Failure Rules
+
+Transport failure → RECOVERING  
+TTL expired → TERMINATED  
+Ambiguity → REJECT or TERMINATE  
+
 Never:
-silently reset identity
-downgrade state without transition
-allow dual binding
-8. Non-Goals
-This control-plane protocol does NOT define:
-Data-plane encryption
-Framing format
-Packet multiplexing
-Kernel hooks
-Obfuscation layer
-It defines behavioral determinism only.
-Final Principle
+
+- silently reset identity
+- mutate without transition
+- allow dual binding
+
+---
+
+Final principle:
+
 Control-plane correctness is more important than transport survival.
-If correctness cannot be guaranteed, the session must terminate explicitly.
-Session is the anchor. Transport is volatile.
+
+Session is the anchor.  
+Transport is volatile.
