@@ -1,181 +1,143 @@
-# Jumping VPN — Production Core (Reference Skeleton)
+# Core Layer — Jumping VPN (Preview)
 
-This directory contains the production-oriented control-plane skeleton
-for Jumping VPN.
+The `core/` directory contains the behavioral runtime skeleton
+for the Jumping VPN session model.
 
-It defines the behavioral core responsible for:
+This is not a full VPN implementation.
+It is a deterministic orchestration layer that models:
 
-- Session identity ownership
-- Deterministic state transitions
-- Transport binding and replacement
-- Bounded recovery under volatility
-- Version-safe mutation logic
-- Explicit invariant enforcement
+- session lifecycle
+- transport volatility
+- bounded recovery
+- replay protection
+- rate limiting
+- policy-driven switching
 
-This is not a complete VPN implementation.
-It is a behavioral core architecture preview.
-
----
-
-# Core Philosophy
-
-Jumping VPN is defined by behavior over time.
-
-The core enforces one primary contract:
-
-- Session is the identity anchor
-- Transport is replaceable
-- Recovery is bounded
-- Ambiguity is rejected
-
-The system must prefer deterministic failure
-over silent inconsistency.
+The goal is architectural clarity, not feature completeness.
 
 ---
 
-# Directory Structure
+## Structure
 
-core/ ├── common/ │   ├── models.py │   ├── reason_codes.py │   ├── errors.py │   └── invariants.py ├── session/ │   └── state_machine.py ├── server/ │   ├── session_store.py │   ├── gateway.py │   └── README.md ├── client/ │   ├── agent.py │   └── README.md └── README.md
-
----
-
-# Layer Responsibilities
-
-## 1. common/
-
-Shared primitives:
-
-- Session models
-- Enumerated state definitions
-- Reason codes
-- Deterministic error classes
-- Invariant enforcement functions
-
-These are the system's formal vocabulary.
+core/ ├── client/                 # client-side behavior skeleton ├── server/                 # server-side session ownership model ├── orchestrator/           # runtime coordination logic ├── policy/                 # deterministic decision engine ├── security/               # anti-replay + rate limiting ├── metrics/                # measurable recovery metrics ├── session/                # state machine └── runtime_demo.py         # minimal behavioral demonstration
 
 ---
 
-## 2. session/
+## What This Core Demonstrates
 
-State machine layer.
+### 1. Deterministic State Transitions
+The session state machine supports:
 
-Defines:
+- BIRTH
+- ATTACHED
+- VOLATILE
+- RECOVERING
+- DEGRADED
+- TERMINATED
 
-- Legal transitions
-- State version increments
-- Deterministic transition enforcement
-- Illegal transition rejection
-
-All state mutation must pass through this layer.
-
----
-
-## 3. server/
-
-Authoritative control-plane ownership.
-
-Includes:
-
-- SessionStore (CAS + TTL)
-- Gateway (control-plane orchestration)
-
-Server responsibilities:
-
-- Bind / unbind transport
-- Enforce single active binding
-- Validate reattach
-- Enforce TTL bounds
-- Reject ambiguous continuation
+All transitions:
+- explicit
+- reason-coded
+- version-monotonic
+- bounded by policy
 
 ---
 
-## 4. client/
+### 2. Bounded Recovery
 
-Client-side control-plane skeleton.
+Transport death does NOT imply session death.
 
-Responsibilities:
+Instead:
 
-- Maintain session context
-- Detect transport volatility
-- Initiate reattach
-- Enforce local cooldown and anti-flap bounds
+ATTACHED → RECOVERING → ATTACHED  
+(or → TERMINATED if recovery window exceeded)
 
-Client never silently resets identity.
+Recovery is limited by:
 
----
+- max_recovery_window_ms
+- switch cooldown
+- anti-flap limits
+- replay protection
 
-# Core Guarantees (Target Invariants)
-
-The system aims to enforce:
-
-- No dual-active transport binding
-- No silent session reset
-- No implicit state transition
-- No version rollback
-- No unbounded switching
-- No ambiguous ownership
-
-If any invariant cannot be satisfied:
-
-→ reject or terminate explicitly.
+No infinite loops.
+No silent resets.
 
 ---
 
-# What This Core Does NOT Contain
+### 3. Replay & Abuse Protection
 
-This directory does NOT include:
+Control-plane operations require:
 
-- Production-grade cryptography
-- Data-plane encryption
-- Kernel networking
-- QUIC/TCP/UDP implementations
-- Performance optimizations
-- Horizontal scaling logic
-- Persistent distributed store
+- monotonic nonce
+- replay window tracking
+- rate-limited switching
 
-This is a behavioral core reference.
+Invalid attempts are rejected deterministically.
 
 ---
 
-# Why This Exists
+### 4. Deterministic Transport Selection
 
-Before performance.
-Before scaling.
-Before optimization.
+Only one ACTIVE transport is allowed.
 
-Behavior must be correct.
+Candidates are ranked by:
 
-A volatile network is not an edge case.
-It is the default.
+(priority, loss, rtt, transport_id)
 
-This core models:
-
-- Volatility as state
-- Recovery as bounded
-- Identity as stable
-- Transport as ephemeral
+No dual-active ambiguity.
+No uncontrolled propagation.
 
 ---
 
-# Review Focus
+## Runtime Demo
 
-Engineers reviewing this layer should assess:
+See:
 
-- Transition safety
+core/runtime_demo.py
+
+This script simulates:
+
+- initial active transport
+- transport death
+- bounded reattach
+- replay rejection
+- return to ATTACHED
+
+It demonstrates the core thesis:
+
+Session survives transport death
+without identity reset
+under bounded constraints.
+
+---
+
+## What This Core Is Not
+
+- Not a production VPN
+- Not hardened cryptography
+- Not a full transport stack
+- Not kernel-integrated
+- Not optimized for throughput
+
+This is a behavioral architecture preview.
+
+---
+
+## Review Focus
+
+Engineers reviewing this layer should evaluate:
+
+- State determinism
 - Version monotonicity
-- CAS correctness
-- TTL enforcement logic
-- Deterministic rejection paths
-- Safety under concurrent mutation attempts
+- Failure boundaries
+- Replay protection logic
+- Switch gating logic
+- Single-owner transport invariant
 
-The core must remain small, explicit, and testable.
+Performance numbers are intentionally not claimed here.
 
 ---
 
-# Design Rule
-
-If behavior cannot be explained deterministically,
-it must not exist in the system.
-
-Session remains the anchor.
-Transport is volatile.
+Session is the anchor.  
+Transport is volatile.  
+Correctness is enforced.
