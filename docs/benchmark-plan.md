@@ -1,202 +1,263 @@
-# Benchmark Plan — Jumping VPN (Preview)
+# Benchmark Plan — Jumping VPN (Architectural Validation)
 
-This document defines how performance and recovery behavior
-should be measured for Jumping VPN.
+This document defines how Jumping VPN will be evaluated
+under transport volatility conditions.
 
-No performance claims are made in this repository.
-This is a structured evaluation plan.
-
----
-
-## 1) Purpose
-
-The goal of benchmarking is to measure:
-
-- Recovery latency after transport death
-- Session continuity correctness
-- Switch stability under churn
-- Control-plane resilience
-- Resource cost per active session
-
-The benchmark must validate behavioral guarantees,
-not just throughput numbers.
+It is a methodology document.
+It does not claim existing performance numbers.
 
 ---
 
-## 2) Test Environment Requirements
+## 1. Objective
 
-All results must specify:
+Validate deterministic session continuity under transport instability.
 
-- CPU model
-- Core count
-- RAM size
-- OS + kernel version
-- Network emulation method (tc/netem, hardware emulator, etc.)
-- Concurrent session count
-- Transport type (UDP/TCP/QUIC)
+Primary questions:
 
-Without full environment disclosure,
-numbers are considered invalid.
+- Does the session survive transport death?
+- Is recovery bounded?
+- Are state transitions explicit and auditable?
+- Are switching decisions rate-limited and stable?
+- Is identity continuity preserved?
 
----
-
-## 3) Core Metrics
-
-### 3.1 Recovery Metrics
-
-- RecoveryLatencyMs  
-  Time between `TRANSPORT_DEAD` and `ATTACHED` after reattach.
-
-- RecoveryAttempts  
-  Number of reattach attempts before success.
-
-- RecoverySuccessRate  
-  % of sessions that recover within policy bounds.
-
-- BoundedRecoveryCompliance  
-  % of recoveries completed within MaxRecoveryWindowMs.
+This benchmark plan focuses on **behavioral correctness first,
+performance second.**
 
 ---
 
-### 3.2 Stability Metrics
+## 2. Scope
 
-- SwitchesPerMinutePerSession
-- FlapSuppressionEffectiveness
-- DEGRADEDEntryRate
-- ExplicitTerminationRate
+This benchmark plan evaluates:
 
-These measure whether switching remains bounded and deterministic.
+- Control-plane behavior
+- Transport death handling
+- Reattach latency
+- Recovery determinism
+- Anti-flap behavior
+- Replay handling correctness
 
----
+This plan does NOT benchmark:
 
-### 3.3 Control-Plane Metrics
-
-- ReattachValidationTimeMs
-- ReattachRejectRate (invalid proof)
-- ReplayDetectionAccuracy
-- ControlPlaneCPUUsage
-
----
-
-### 3.4 Data-Plane Impact
-
-(Not cryptographic performance — behavioral impact only)
-
-- PacketLossDuringRecovery (%)
-- JitterIncreaseDuringSwitch (ms)
-- SessionContinuityIntegrity (boolean check)
+- Encryption throughput
+- Kernel-level networking performance
+- Hardware offload behavior
+- Wire-speed optimization
 
 ---
 
-### 3.5 Resource Metrics
+## 3. Test Environment Definition
 
-- MemoryPerSession (bytes)
-- CPUPer1kSessions (%)
-- SessionTableLookupLatency
-- StateMutationLatency
+Every benchmark run must define:
 
-All metrics must remain bounded and scale predictably.
+### 3.1 Network Profile
+
+- Packet loss (%)
+- Latency (ms)
+- Jitter (ms)
+- Burst loss pattern
+- NAT churn frequency
+- Path drop simulation timing
+
+Example profile:
+
+loss = 5% latency = 120ms jitter = 40ms burst_loss = 500ms every 10s nat_rotation = every 60s
 
 ---
 
-## 4) Failure Profiles to Test
+### 3.2 Session Parameters
 
-### 4.1 Transport Death
-- Hard UDP socket close
-- Port change (NAT churn)
-- Route drop
+- Session TTL
+- Transport-loss TTL
+- MaxRecoveryWindowMs
+- MaxSwitchesPerMinute
+- Replay window size
+- Cooldown duration
+
+All policy parameters must be logged.
+
+---
+
+## 4. Core Metrics
+
+### 4.1 Recovery Metrics
+
+- `transport_death_events`
+- `successful_reattach_count`
+- `failed_reattach_count`
+- `average_recovery_latency_ms`
+- `p95_recovery_latency_ms`
+- `max_recovery_latency_ms`
+
+Recovery latency is measured from:
+
+TRANSPORT_DEAD → ATTACHED (post-reattach)
+
+---
+
+### 4.2 Stability Metrics
+
+- `switch_count_per_minute`
+- `cooldown_trigger_count`
+- `degenerate_loop_detected`
+- `oscillation_detected`
+
+System must not exceed:
+
+- configured max switch rate
+- bounded recovery attempts
+
+---
+
+### 4.3 Safety Metrics
+
+- `dual_binding_detected` (must be 0)
+- `replay_rejected_count`
+- `state_version_conflict_count`
+- `ambiguous_ownership_detected` (must be 0)
+- `silent_reset_detected` (must be 0)
+
+Any non-zero value for invariant violations invalidates test.
+
+---
+
+### 4.4 Degradation Metrics
+
+- `degraded_state_entries`
+- `degraded_duration_ms`
+- `forced_termination_count`
+- `ttl_expiration_count`
+
+Degradation must be explicit.
+Termination must be reason-coded.
+
+---
+
+## 5. Failure Injection Scenarios
+
+### Scenario A — Single Transport Death
+
+Trigger:
+- Immediate socket drop
 
 Expected:
-- No silent reset
-- Deterministic recovery
-- Single active binding invariant preserved
+- RECOVERING state
+- REATTACH_REQUEST
+- ATTACHED
+- No identity reset
 
 ---
 
-### 4.2 Packet Loss Spike
-- 10%
-- 30%
-- 60%
+### Scenario B — Packet Loss Spike
+
+Trigger:
+- 30% packet loss for 3 seconds
 
 Expected:
-- VOLATILE → RECOVERING
+- VOLATILE state
+- Possibly DEGRADED
 - Bounded switching
-- No uncontrolled loops
+- No uncontrolled oscillation
 
 ---
 
-### 4.3 Latency Surge
-- +200ms
-- +500ms
-- +1000ms
+### Scenario C — NAT Rebinding
+
+Trigger:
+- Client source port change mid-session
 
 Expected:
-- Policy-driven decision
-- Optional DEGRADED mode
-- No session ID mutation
+- Reattach validation
+- Fresh binding
+- No dual-active transport
 
 ---
 
-### 4.4 Control-Plane Abuse
+### Scenario D — Reattach Flood Attempt
 
-- Reattach flood (invalid proof)
-- Replay attempt burst
-- Ownership conflict attempt
+Trigger:
+- 100 reattach attempts per second
 
 Expected:
-- Early rejection
-- No state corruption
-- No dual-active binding
+- Rate limiter engages
+- No uncontrolled switch amplification
+- Session integrity preserved
 
 ---
 
-## 5) Scale Targets (Evaluation Phases)
+### Scenario E — Cluster Split Attempt
 
-Phase 1:
-- 100 sessions
-- Controlled lab volatility
+Trigger:
+- Simulated dual-node reattach acceptance attempt
 
-Phase 2:
-- 1,000 sessions
-- Synthetic churn
-
-Phase 3:
-- 10,000+ sessions
-- Mixed volatility + abuse simulation
-
-No claims until Phase 2 minimum.
+Expected:
+- Single authoritative owner
+- One acceptance
+- Other rejected deterministically
 
 ---
 
-## 6) Success Criteria
+## 6. Scale Targets (Planned)
 
-The benchmark is considered successful if:
+Future evaluation goals:
 
-- No dual-active transport binding occurs
-- No silent identity reset occurs
-- All state transitions are reason-coded
-- Recovery remains within bounded window
-- Resource usage scales predictably
+- 1k concurrent sessions
+- 10k concurrent sessions
+- Sustained churn simulation
+- High volatility scenario (mobile profile)
 
-If instability exceeds bounds:
-- Explicit DEGRADED or TERMINATED must occur
-- Never silent failure
+No performance claims will be published
+without reproducible test conditions.
 
 ---
 
-## 7) Publication Rule
+## 7. Evidence Requirements
 
-Performance numbers must include:
+Every published benchmark must include:
 
-- full test conditions
-- volatility profile
-- policy configuration
-- session count
-- hardware specs
+- Full network profile
+- Full policy configuration
+- Version hash of implementation
+- Raw event logs
+- Reproducible scripts
+- Clear success/failure criteria
 
-Unreproducible numbers are invalid.
+No synthetic “marketing numbers.”
 
 ---
 
-Session is the anchor.  
+## 8. Pass Criteria
+
+The benchmark passes if:
+
+- No invariant violation occurs
+- No dual-active binding occurs
+- No silent session reset occurs
+- Recovery latency remains within defined bounds
+- Switching stays within configured rate limits
+
+If correctness cannot be guaranteed,
+termination must be explicit.
+
+---
+
+## 9. Publication Policy
+
+Results will only be published when:
+
+- Test conditions are reproducible
+- Metrics are complete
+- Failure cases are documented
+- No cherry-picked results are shown
+
+Transparency > marketing.
+
+---
+
+## Final Principle
+
+Benchmarking volatility is not about speed.
+
+It is about bounded correctness under instability.
+
+Session is the anchor.
 Transport is volatile.
