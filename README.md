@@ -172,6 +172,24 @@ See:
 
 ---
 
+## 🔬 Open Engineering Questions
+
+The following areas remain under exploration:
+
+- Distributed session ownership model
+- Clustered state synchronization
+- Formal verification feasibility
+- Performance under high churn (10k+ sessions)
+- QUIC-based transport experiments
+
+These are not omissions.  
+They are active research directions.
+
+This repository prioritizes behavioral correctness
+over feature completeness.
+
+---
+
 ## 🎯 Intended Audience
 
 This project may be relevant to:
