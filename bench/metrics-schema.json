@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Jumping VPN Benchmark Metrics (Public Preview)",
+  "type": "object",
+  "required": ["run_id", "scenario", "policy_version", "environment", "events"],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "description": "Unique identifier for a benchmark run."
+    },
+    "scenario": {
+      "type": "string",
+      "description": "Scenario name, e.g., clean_failover, loss_spike, nat_rebind."
+    },
+    "policy_version": {
+      "type": "string",
+      "description": "Policy version used for the run."
+    },
+    "environment": {
+      "type": "object",
+      "required": ["platform", "network_profile"],
+      "properties": {
+        "platform": { "type": "string", "description": "Host/OS/runtime notes." },
+        "network_profile": {
+          "type": "object",
+          "required": ["loss_pct", "latency_ms", "jitter_ms"],
+          "properties": {
+            "loss_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+            "latency_ms": { "type": "number", "minimum": 0 },
+            "jitter_ms": { "type": "number", "minimum": 0 }
+          }
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "events": {
+      "type": "array",
+      "description": "Ordered event stream for the run.",
+      "items": {
+        "type": "object",
+        "required": ["ts_ms", "event_type", "session_id"],
+        "properties": {
+          "ts_ms": { "type": "integer", "minimum": 0 },
+          "event_type": { "type": "string" },
+          "session_id": { "type": "string" },
+          "node_id": { "type": "string" },
+          "previous_state": { "type": "string" },
+          "new_state": { "type": "string" },
+          "reason_code": { "type": "string" },
+          "transport_id": { "type": "string" },
+          "previous_transport": { "type": "string" },
+          "new_transport": { "type": "string" },
+          "latency_estimate_ms": { "type": "number", "minimum": 0 },
+          "loss_ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+          "candidate_count": { "type": "integer", "minimum": 0 },
+          "switch_count_window": { "type": "integer", "minimum": 0 },
+          "security_flag": { "type": "boolean" },
+          "details": { "type": "object" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "summary": {
+      "type": "object",
+      "description": "Optional computed summary metrics.",
+      "properties": {
+        "time_to_detect_ms": { "type": "number", "minimum": 0 },
+        "time_to_switch_ms": { "type": "number", "minimum": 0 },
+        "time_to_reattach_ms": { "type": "number", "minimum": 0 },
+        "reattach_success": { "type": "boolean" },
+        "switches_total": { "type": "integer", "minimum": 0 },
+        "replay_detected_total": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "additionalProperties": false
+}
