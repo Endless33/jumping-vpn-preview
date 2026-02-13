@@ -1,127 +1,202 @@
 # Benchmark Plan — Jumping VPN (Preview)
 
-This document defines the measurement strategy for evaluating
-deterministic recovery under transport volatility.
+This document defines how performance and recovery behavior
+should be measured for Jumping VPN.
 
-This is not a performance claim.
-This is a reproducible testing plan.
-
----
-
-## 1. Objectives
-
-Measure:
-
-- Session continuity under transport death
-- Recovery latency (ms)
-- Switch rate stability (anti-flap)
-- Identity persistence guarantees
-- Behavior under packet loss spikes
+No performance claims are made in this repository.
+This is a structured evaluation plan.
 
 ---
 
-## 2. Test Scenarios
+## 1) Purpose
 
-### Scenario A — Single Transport Death
+The goal of benchmarking is to measure:
 
-Conditions:
-- Active UDP transport
-- Abrupt socket termination
+- Recovery latency after transport death
+- Session continuity correctness
+- Switch stability under churn
+- Control-plane resilience
+- Resource cost per active session
+
+The benchmark must validate behavioral guarantees,
+not just throughput numbers.
+
+---
+
+## 2) Test Environment Requirements
+
+All results must specify:
+
+- CPU model
+- Core count
+- RAM size
+- OS + kernel version
+- Network emulation method (tc/netem, hardware emulator, etc.)
+- Concurrent session count
+- Transport type (UDP/TCP/QUIC)
+
+Without full environment disclosure,
+numbers are considered invalid.
+
+---
+
+## 3) Core Metrics
+
+### 3.1 Recovery Metrics
+
+- RecoveryLatencyMs  
+  Time between `TRANSPORT_DEAD` and `ATTACHED` after reattach.
+
+- RecoveryAttempts  
+  Number of reattach attempts before success.
+
+- RecoverySuccessRate  
+  % of sessions that recover within policy bounds.
+
+- BoundedRecoveryCompliance  
+  % of recoveries completed within MaxRecoveryWindowMs.
+
+---
+
+### 3.2 Stability Metrics
+
+- SwitchesPerMinutePerSession
+- FlapSuppressionEffectiveness
+- DEGRADEDEntryRate
+- ExplicitTerminationRate
+
+These measure whether switching remains bounded and deterministic.
+
+---
+
+### 3.3 Control-Plane Metrics
+
+- ReattachValidationTimeMs
+- ReattachRejectRate (invalid proof)
+- ReplayDetectionAccuracy
+- ControlPlaneCPUUsage
+
+---
+
+### 3.4 Data-Plane Impact
+
+(Not cryptographic performance — behavioral impact only)
+
+- PacketLossDuringRecovery (%)
+- JitterIncreaseDuringSwitch (ms)
+- SessionContinuityIntegrity (boolean check)
+
+---
+
+### 3.5 Resource Metrics
+
+- MemoryPerSession (bytes)
+- CPUPer1kSessions (%)
+- SessionTableLookupLatency
+- StateMutationLatency
+
+All metrics must remain bounded and scale predictably.
+
+---
+
+## 4) Failure Profiles to Test
+
+### 4.1 Transport Death
+- Hard UDP socket close
+- Port change (NAT churn)
+- Route drop
 
 Expected:
-- Explicit transport switch
-- No session reset
-- No identity renegotiation
-
-Metrics:
-- Time to reattach (ms)
-- State transitions count
-- Audit events emitted
+- No silent reset
+- Deterministic recovery
+- Single active binding invariant preserved
 
 ---
 
-### Scenario B — Packet Loss Spike
-
-Conditions:
-- 20–40% packet loss for 2–5 seconds
+### 4.2 Packet Loss Spike
+- 10%
+- 30%
+- 60%
 
 Expected:
-- VOLATILE → RECOVERING → ATTACHED
-- No uncontrolled termination
-
-Metrics:
-- Volatility detection delay
-- Switch decision latency
-- Recovery window duration
+- VOLATILE → RECOVERING
+- Bounded switching
+- No uncontrolled loops
 
 ---
 
-### Scenario C — Transport Flapping
-
-Conditions:
-- Rapid path degradation events
+### 4.3 Latency Surge
+- +200ms
+- +500ms
+- +1000ms
 
 Expected:
-- Rate-limited switching
-- Dampening applied
-- Possible DEGRADED state
-
-Metrics:
-- Switches per minute
-- Policy enforcement behavior
-- Final state outcome
+- Policy-driven decision
+- Optional DEGRADED mode
+- No session ID mutation
 
 ---
 
-## 3. Measurement Environment
+### 4.4 Control-Plane Abuse
 
-Testing tools (planned):
+- Reattach flood (invalid proof)
+- Replay attempt burst
+- Ownership conflict attempt
 
-- tc / netem (Linux)
-- Controlled packet loss injection
-- UDP socket-level interruption
-- Synthetic multi-path simulation
-
----
-
-## 4. Metrics Definition
-
-| Metric | Definition |
-|--------|------------|
-| RecoveryLatencyMs | Time between transport death and reattach |
-| SwitchRate | Switches per minute |
-| SessionResetCount | Must remain zero under bounded volatility |
-| DualBindingIncidents | Must remain zero |
-| InvariantViolations | Must remain zero |
+Expected:
+- Early rejection
+- No state corruption
+- No dual-active binding
 
 ---
 
-## 5. Non-Goals
+## 5) Scale Targets (Evaluation Phases)
 
-This benchmark does NOT measure:
+Phase 1:
+- 100 sessions
+- Controlled lab volatility
 
-- Throughput optimization
-- Encryption performance
-- Global latency minimization
-- Anonymity guarantees
+Phase 2:
+- 1,000 sessions
+- Synthetic churn
 
-Scope is strictly:
+Phase 3:
+- 10,000+ sessions
+- Mixed volatility + abuse simulation
 
-Deterministic recovery under transport instability.
-
----
-
-## 6. Publication Policy
-
-Performance data will only be published:
-
-- With reproducible scripts
-- With environment disclosure
-- With network condition transparency
-
-No synthetic marketing benchmarks.
+No claims until Phase 2 minimum.
 
 ---
 
-Session continuity must be measurable —
-or it is not a guarantee.
+## 6) Success Criteria
+
+The benchmark is considered successful if:
+
+- No dual-active transport binding occurs
+- No silent identity reset occurs
+- All state transitions are reason-coded
+- Recovery remains within bounded window
+- Resource usage scales predictably
+
+If instability exceeds bounds:
+- Explicit DEGRADED or TERMINATED must occur
+- Never silent failure
+
+---
+
+## 7) Publication Rule
+
+Performance numbers must include:
+
+- full test conditions
+- volatility profile
+- policy configuration
+- session count
+- hardware specs
+
+Unreproducible numbers are invalid.
+
+---
+
+Session is the anchor.  
+Transport is volatile.
