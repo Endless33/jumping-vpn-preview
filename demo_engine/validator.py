@@ -1,11 +1,6 @@
 import json
 
 class DemoValidator:
-    """
-    Validates the generated demo_output.jsonl file.
-    Ensures ordering, state transitions, invariants, and required events.
-    """
-
     REQUIRED_EVENTS = [
         "SESSION_CREATED",
         "VOLATILITY_SIGNAL",
@@ -42,11 +37,16 @@ class DemoValidator:
         if timestamps != sorted(timestamps):
             self.errors.append("Timestamps are not strictly increasing")
 
+    def check_flow_control(self):
+        for e in self.events:
+            if "cwnd" in e:
+                if e["cwnd"] <= 0:
+                    self.errors.append("Invalid cwnd value")
+            if "pacing_rate" in e:
+                if e["pacing_rate"] <= 0:
+                    self.errors.append("Invalid pacing_rate value")
+
     def check_state_progression(self):
-        """
-        Ensures the state progression follows the expected path:
-        ATTACHED → VOLATILE → DEGRADED → REATTACHING → RECOVERING → ATTACHED
-        """
         expected = [
             "SESSION_CREATED",
             "VOLATILITY_SIGNAL",
@@ -83,7 +83,7 @@ class DemoValidator:
         self.load()
         self.check_required_events()
         self.check_timestamp_order()
+        self.check_flow_control()
         self.check_state_progression()
         self.check_audit()
-
         return self.errors
