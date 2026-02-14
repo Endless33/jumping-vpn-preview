@@ -5,7 +5,8 @@ class DemoValidator:
         "SESSION_CREATED",
         "VOLATILITY_SIGNAL",
         "DEGRADED_ENTERED",
-        "CANDIDATE_SCORES",
+        "CANDIDATE_SCORES_RAW",
+        "CANDIDATE_SCORES_WEIGHTED",
         "BEST_CANDIDATE_SELECTED",
         "AUDIT_EVENT",
         "REATTACH_REQUEST",
@@ -36,6 +37,17 @@ class DemoValidator:
         timestamps = [e["ts_ms"] for e in self.events]
         if timestamps != sorted(timestamps):
             self.errors.append("Timestamps are not strictly increasing")
+
+    def check_weighting(self):
+        weighted = [e for e in self.events if e["event"] == "CANDIDATE_SCORES_WEIGHTED"]
+        if not weighted:
+            self.errors.append("Missing weighted scoring event")
+            return
+
+        scores = weighted[0]["scores"]
+        for k, v in scores.items():
+            if v <= 0:
+                self.errors.append(f"Invalid weighted score for {k}")
 
     def check_health(self):
         for e in self.events:
@@ -87,6 +99,7 @@ class DemoValidator:
         self.load()
         self.check_required_events()
         self.check_timestamp_order()
+        self.check_weighting()
         self.check_health()
         self.check_flow_control()
         self.check_state_progression()
