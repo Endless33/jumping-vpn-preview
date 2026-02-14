@@ -93,7 +93,7 @@ class DemoEngine:
 
         # PHASE 4 — MULTIPATH SCORING + WEIGHTING
         cand_list = self.candidates.list_candidates()
-        raw_scores = {c: self.scoring.score(loss, jitter, rtt) for c in cand_list}
+        raw_scores = {c: self.scoring.score(loss, jitter, self.health.rtt_smoothed.get()) for c in cand_list}
         weighted_scores = self.weights.apply(raw_scores)
         best = max(weighted_scores, key=weighted_scores.get)
 
