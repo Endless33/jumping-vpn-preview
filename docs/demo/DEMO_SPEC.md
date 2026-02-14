@@ -14,18 +14,18 @@ It defines inputs, steps, and expected outputs.
 
 Show (in 20–30 seconds of runtime output):
 
-1) A session is created and remains the identity anchor  
-2) Transport quality degrades (packet loss / jitter spike)  
-3) Flow-control reacts (cwnd/pacing adjusts)  
-4) A deterministic transport switch occurs (if a better candidate exists)  
+1) A session is created and remains the identity anchor
+2) Transport quality degrades (packet loss / jitter spike)
+3) Flow-control reacts (cwnd/pacing adjusts)
+4) A deterministic transport switch occurs (if a better candidate exists)
 5) The session returns to ATTACHED (no identity reset)
 
 ---
 
 ## Test Conditions (Reproducible)
 
-- Baseline: loss ~0%, stable RTT  
-- Volatility phase: loss spike to 5–10% for 3–5 seconds  
+- Baseline: loss ~0%, stable RTT
+- Volatility phase: loss spike to 5–10% for 3–5 seconds
 - Candidate transport exists (Path B) with better score during volatility
 
 ---
@@ -40,7 +40,7 @@ Expected:
 - State: `ATTACHED`
 
 ### Step 1 — Volatility Signal
-Inject loss/jitter spike.  
+Inject loss/jitter spike.
 Expected:
 - `VOLATILITY_SIGNAL`
 - `STATE_CHANGE: ATTACHED -> VOLATILE`
@@ -68,17 +68,22 @@ Expected:
 ## Hard Pass/Fail Criteria
 
 PASS if:
-- SessionID stays constant across the entire run  
-- No `TERMINATED` occurs while a candidate transport is alive  
-- Switch is explicit + reason-coded  
+- SessionID stays constant across the entire run
+- No `TERMINATED` occurs while a candidate transport is alive
+- Switch is explicit + reason-coded
 - State transitions are monotonic (versioned)
 
 FAIL if:
-- Identity resets / new session created during failover  
-- Dual-active binding occurs  
-- Silent renegotiation replaces session identity  
+- Identity resets / new session created during failover
+- Dual-active binding occurs
+- Silent renegotiation replaces session identity
 - Non-deterministic oscillation occurs outside policy bounds
 
 ---
 
-## Output Contract
+## Output Contract (JSONL)
+
+The demo produces an event stream in JSONL (one event per line).
+See: `DEMO_OUTPUT_FORMAT.md`
+
+Session is the anchor. Transport is volatile.
