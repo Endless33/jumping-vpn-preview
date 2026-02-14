@@ -82,26 +82,37 @@ Fields:
 {"ts_ms":1700000002100,"event":"STATE_CHANGE","session_id":"s_9f2c","from":"RECOVERING","to":"ATTACHED","reason":"RECOVERY_COMPLETE","state_version":3}
 
 Key Observations
+
 This trace demonstrates:
+
 Identity continuity
+
 Session ID never changes:
 
 session_id = s_9f2c
 
 Transport changed.
+
 Identity did not.
+
 Explicit transport switch
+
 Transport switched from:
 
 udp:A → udp:B
 
 This was explicit, controlled, and auditable.
+
 No renegotiation
+
 There is no:
+
 SESSION_RESET
 HANDSHAKE_RESTART
 IDENTITY_CHANGE
+
 Flow control reacted deterministically
+
 cwnd reduced:
 
 72 → 36 packets
@@ -111,7 +122,9 @@ pacing reduced:
 1350 → 820 packets/sec
 
 This shows congestion response.
+
 Session survived
+
 Final state:
 
 ATTACHED
