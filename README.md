@@ -75,8 +75,6 @@ DEMO_PACKAGE.zip — zipped lifecycle package
 
 The demo is deterministic, observable, reproducible.
 
----
-
 🔎 Core Thesis
 
 Modern networks are inherently unstable:
@@ -100,8 +98,6 @@ Session identity — persistent, cryptographically anchored
 Transport binding — volatile, replaceable, auditable
 
 Transport death ≠ session death (within bounded policy).
-
----
 
 🧠 Architectural Model
 
@@ -152,8 +148,6 @@ RECOVERING
 TERMINATED
 
 Transitions are deterministic and logged.
-
----
 
 📂 Repository Structure
 
@@ -214,8 +208,6 @@ Transitions are deterministic and logged.
 └── core/
     └── README.md
 
----
-
 🧬 Mutation Logs
 
 Mutation Logs document the evolution of:
@@ -231,8 +223,6 @@ reconnect semantics
 protocol invariants
 
 They serve as architectural archaeology.
-
----
 
 🌐 Real UDP Prototype (Behavioral Validation)
 
@@ -258,8 +248,6 @@ poc/README_udp.md
 
 This is behavioral validation, not production cryptography.
 
----
-
 🛡 Threat Model & Boundaries
 
 Jumping VPN defines:
@@ -282,8 +270,6 @@ docs/core/invariants.md
 
 docs/core/state-machine.md
 
----
-
 🚫 Explicit Non‑Goals
 
 Jumping VPN does not aim to provide:
@@ -302,8 +288,6 @@ Scope is intentionally narrow:
 
 session continuity under transport volatility
 
----
-
 🔬 Open Engineering Questions
 
 Active research areas:
@@ -320,8 +304,6 @@ performance under high churn
 
 Behavioral correctness takes priority.
 
----
-
 🎯 Intended Audience
 
 Relevant for:
@@ -334,8 +316,6 @@ security architects designing deterministic recovery
 
 operators exploring transport abstraction
 
----
-
 🧭 Philosophy
 
 Jumping VPN is an architectural thesis:
@@ -347,8 +327,6 @@ contracts first
 rigor over hype
 
 Architecture does not require permission.It requires consistency.
-
----
 
 📈 Status
 
@@ -364,8 +342,6 @@ exposes staged documentation
 
 focuses on behavioral modeling
 
----
-
 🤝 Technical Discussions
 
 Open to discussions on:
@@ -380,8 +356,6 @@ operator‑grade observability
 
 📧 riabovasvitalijus@gmail.com
 
----
-
 Final Principle
 
 Transport instability is not an anomaly —it is the default condition of modern networks.
@@ -389,6 +363,3 @@ Transport instability is not an anomaly —it is the default condition of modern
 Jumping VPN treats volatility as modeled behavior, not as failure.
 
 Session remains the anchor.Transports come and go.
-
-
----
