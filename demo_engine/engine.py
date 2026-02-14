@@ -8,6 +8,7 @@ from .candidates import CandidateGenerator
 from .audit import Audit
 from .recovery import RecoveryWindow
 from .flow_control import FlowControl
+from .transport_health import TransportHealth
 
 
 class DemoEngine:
@@ -23,6 +24,7 @@ class DemoEngine:
         self.audit = Audit()
         self.recovery = RecoveryWindow(window_ms=2000)
         self.flow = FlowControl()
+        self.health = TransportHealth()
 
     def tick(self, ms: int):
         self.ts += ms
@@ -48,19 +50,20 @@ class DemoEngine:
         rtt = self.vol.rtt_spike()
 
         self.flow.degrade(loss)
+        self.health.update(loss, jitter, rtt)
 
         self.sm.transition(State.VOLATILE, "loss_threshold_exceeded")
         self.emit("VOLATILITY_SIGNAL",
-                  loss_pct=loss,
-                  jitter_ms=jitter,
-                  rtt_ms=rtt,
+                  **self.health.snapshot(),
                   **self.flow.snapshot())
 
         # PHASE 3 — DEGRADED
         if self.policy.allow_switch(loss):
             self.tick(1000)
             self.sm.transition(State.DEGRADED, "quality_below_threshold")
-            self.emit("DEGRADED_ENTERED", **self.flow.snapshot())
+            self.emit("DEGRADED_ENTERED",
+                      **self.health.snapshot(),
+                      **self.flow.snapshot())
 
         # PHASE 4 — MULTIPATH SCORING
         cand_list = self.candidates.list_candidates()
@@ -86,7 +89,9 @@ class DemoEngine:
         # PHASE 7 — RECOVERING
         self.tick(500)
         self.sm.transition(State.RECOVERING, "new_transport_validated")
-        self.emit("RECOVERY_SIGNAL", **self.flow.snapshot())
+        self.emit("RECOVERY_SIGNAL",
+                  **self.health.snapshot(),
+                  **self.flow.snapshot())
 
         # PHASE 8 — RECOVERY WINDOW
         while not self.recovery.is_stable():
@@ -95,10 +100,13 @@ class DemoEngine:
             self.flow.recover()
             self.emit("RECOVERY_PROGRESS",
                       elapsed_ms=self.recovery.elapsed,
+                      **self.health.snapshot(),
                       **self.flow.snapshot())
 
         # PHASE 9 — BACK TO ATTACHED
         self.sm.transition(State.ATTACHED, "metrics_stabilized")
-        self.emit("ATTACHED_RESTORED", **self.flow.snapshot())
+        self.emit("ATTACHED_RESTORED",
+                  **self.health.snapshot(),
+                  **self.flow.snapshot())
 
         self.emitter.close()
