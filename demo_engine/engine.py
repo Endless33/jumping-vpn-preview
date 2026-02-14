@@ -2,6 +2,7 @@ from .events import Event
 from .state_machine import StateMachine, State
 from .emitter import Emitter
 from .volatility import VolatilitySimulator
+from .policy import Policy
 
 
 class DemoEngine:
@@ -11,6 +12,7 @@ class DemoEngine:
         self.sm = StateMachine()
         self.emitter = Emitter(output_path)
         self.vol = VolatilitySimulator()
+        self.policy = Policy()
 
     def tick(self, ms: int):
         self.ts += ms
@@ -39,9 +41,10 @@ class DemoEngine:
         self.emit("VOLATILITY_SIGNAL", loss_pct=loss, jitter_ms=jitter, rtt_ms=rtt)
 
         # PHASE 3 — DEGRADED
-        self.tick(1000)
-        self.sm.transition(State.DEGRADED, "quality_below_threshold")
-        self.emit("DEGRADED_ENTERED")
+        if self.policy.allow_switch(loss):
+            self.tick(1000)
+            self.sm.transition(State.DEGRADED, "quality_below_threshold")
+            self.emit("DEGRADED_ENTERED")
 
         # PHASE 4 — REATTACHING
         self.tick(1000)
@@ -56,8 +59,9 @@ class DemoEngine:
         self.emit("RECOVERY_SIGNAL")
 
         # PHASE 6 — BACK TO ATTACHED
-        self.tick(2000)
-        self.sm.transition(State.ATTACHED, "metrics_stabilized")
-        self.emit("ATTACHED_RESTORED")
+        if self.policy.allow_recovery(rtt):
+            self.tick(2000)
+            self.sm.transition(State.ATTACHED, "metrics_stabilized")
+            self.emit("ATTACHED_RESTORED")
 
         self.emitter.close()
