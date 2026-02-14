@@ -1,0 +1,57 @@
+from .events import Event
+from .state_machine import StateMachine, State
+from .emitter import Emitter
+
+
+class DemoEngine:
+    def __init__(self, session_id: str, output_path: str):
+        self.session_id = session_id
+        self.ts = 0
+        self.sm = StateMachine()
+        self.emitter = Emitter(output_path)
+
+    def tick(self, ms: int):
+        self.ts += ms
+
+    def emit(self, event: str, **data):
+        ev = Event(
+            ts_ms=self.ts,
+            event=event,
+            session_id=self.session_id,
+            data=data
+        )
+        self.emitter.emit(ev)
+
+    def run(self):
+        # PHASE 1 — BIRTH → ATTACHED
+        self.sm.transition(State.ATTACHED, "initial_attach")
+        self.emit("SESSION_CREATED", state="ATTACHED")
+
+        # PHASE 2 — VOLATILITY
+        self.tick(5000)
+        self.sm.transition(State.VOLATILE, "loss_threshold_exceeded")
+        self.emit("VOLATILITY_SIGNAL", loss_pct=7.2)
+
+        # PHASE 3 — DEGRADED
+        self.tick(1000)
+        self.sm.transition(State.DEGRADED, "quality_below_threshold")
+        self.emit("DEGRADED_ENTERED")
+
+        # PHASE 4 — REATTACHING
+        self.tick(1000)
+        self.emit("REATTACH_REQUEST", candidate="udp:B")
+        self.emit("REATTACH_PROOF", proof="ok")
+        self.sm.transition(State.REATTACHING, "preferred_path_changed")
+        self.emit("TRANSPORT_SWITCH", from_="udp:A", to="udp:B")
+
+        # PHASE 5 — RECOVERING
+        self.tick(2000)
+        self.sm.transition(State.RECOVERING, "new_transport_validated")
+        self.emit("RECOVERY_SIGNAL")
+
+        # PHASE 6 — BACK TO ATTACHED
+        self.tick(2000)
+        self.sm.transition(State.ATTACHED, "metrics_stabilized")
+        self.emit("ATTACHED_RESTORED")
+
+        self.emitter.close()
