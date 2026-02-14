@@ -9,6 +9,7 @@ from .audit import Audit
 from .recovery import RecoveryWindow
 from .flow_control import FlowControl
 from .transport_health import TransportHealth
+from .weights import CandidateWeights
 
 
 class DemoEngine:
@@ -25,6 +26,7 @@ class DemoEngine:
         self.recovery = RecoveryWindow(window_ms=2000)
         self.flow = FlowControl()
         self.health = TransportHealth()
+        self.weights = CandidateWeights()
 
     def tick(self, ms: int):
         self.ts += ms
@@ -65,12 +67,14 @@ class DemoEngine:
                       **self.health.snapshot(),
                       **self.flow.snapshot())
 
-        # PHASE 4 — MULTIPATH SCORING
+        # PHASE 4 — MULTIPATH SCORING + WEIGHTING
         cand_list = self.candidates.list_candidates()
-        cand_scores = {c: self.scoring.score(loss, jitter, rtt) for c in cand_list}
-        best = self.scoring.pick_best(cand_scores)
+        raw_scores = {c: self.scoring.score(loss, jitter, rtt) for c in cand_list}
+        weighted_scores = self.weights.apply(raw_scores)
+        best = max(weighted_scores, key=weighted_scores.get)
 
-        self.emit("CANDIDATE_SCORES", scores=cand_scores)
+        self.emit("CANDIDATE_SCORES_RAW", scores=raw_scores)
+        self.emit("CANDIDATE_SCORES_WEIGHTED", scores=weighted_scores)
         self.emit("BEST_CANDIDATE_SELECTED", candidate=best)
 
         # PHASE 5 — AUDIT BEFORE SWITCH
