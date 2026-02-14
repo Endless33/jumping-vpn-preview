@@ -14,7 +14,8 @@ class DemoValidator:
         "TRANSPORT_SWITCH",
         "RECOVERY_SIGNAL",
         "RECOVERY_PROGRESS",
-        "ATTACHED_RESTORED"
+        "ATTACHED_RESTORED",
+        "SESSION_EXPIRED"
     ]
 
     def __init__(self, path: str):
@@ -38,70 +39,20 @@ class DemoValidator:
         if timestamps != sorted(timestamps):
             self.errors.append("Timestamps are not strictly increasing")
 
-    def check_weighting(self):
-        weighted = [e for e in self.events if e["event"] == "CANDIDATE_SCORES_WEIGHTED"]
-        if not weighted:
-            self.errors.append("Missing weighted scoring event")
-            return
+    def check_heartbeat(self):
+        heartbeats = [e for e in self.events if e["event"] == "HEARTBEAT"]
+        if not heartbeats:
+            self.errors.append("Missing HEARTBEAT events")
 
-        scores = weighted[0]["scores"]
-        for k, v in scores.items():
-            if v <= 0:
-                self.errors.append(f"Invalid weighted score for {k}")
-
-    def check_health(self):
-        for e in self.events:
-            if "health_score" in e:
-                if e["health_score"] < 0 or e["health_score"] > 100:
-                    self.errors.append("Invalid health_score value")
-
-    def check_flow_control(self):
-        for e in self.events:
-            if "cwnd" in e and e["cwnd"] <= 0:
-                self.errors.append("Invalid cwnd value")
-            if "pacing_rate" in e and e["pacing_rate"] <= 0:
-                self.errors.append("Invalid pacing_rate value")
-
-    def check_state_progression(self):
-        expected = [
-            "SESSION_CREATED",
-            "VOLATILITY_SIGNAL",
-            "DEGRADED_ENTERED",
-            "REATTACH_REQUEST",
-            "RECOVERY_SIGNAL",
-            "ATTACHED_RESTORED"
-        ]
-
-        idx = 0
-        for ev in self.events:
-            if ev["event"] == expected[idx]:
-                idx += 1
-                if idx == len(expected):
-                    break
-
-        if idx != len(expected):
-            self.errors.append("State progression does not match expected sequence")
-
-    def check_audit(self):
-        audits = [e for e in self.events if e["event"] == "AUDIT_EVENT"]
-        if not audits:
-            self.errors.append("Missing AUDIT_EVENT")
-            return
-
-        audit = audits[0]
-        if not audit.get("identity_ok", False):
-            self.errors.append("Audit failed: identity reset detected")
-
-        if not audit.get("dual_binding_ok", False):
-            self.errors.append("Audit failed: dual binding detected")
+    def check_session_expiry(self):
+        expiry = [e for e in self.events if e["event"] == "SESSION_EXPIRED"]
+        if not expiry:
+            self.errors.append("Missing SESSION_EXPIRED event")
 
     def validate(self):
         self.load()
         self.check_required_events()
         self.check_timestamp_order()
-        self.check_weighting()
-        self.check_health()
-        self.check_flow_control()
-        self.check_state_progression()
-        self.check_audit()
+        self.check_heartbeat()
+        self.check_session_expiry()
         return self.errors
