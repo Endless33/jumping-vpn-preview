@@ -99,6 +99,8 @@ Transport binding — volatile, replaceable, auditable
 
 Transport death ≠ session death (within bounded policy).
 
+---
+
 🧠 Architectural Model
 
 Jumping VPN is defined by behavior over time, not by static configuration.
