@@ -1,173 +1,94 @@
-# Jumping VPN — Documentation Index
+# Jumping VPN — Documentation Portal
 
-This document provides a structured navigation map
-for the Jumping VPN architectural preview.
+This directory contains the full architectural, behavioral, and demo‑level
+documentation for the Jumping VPN protocol.
 
-Estimated full review time:
-30–60 minutes.
+The documentation is divided into two major layers:
 
----
-
-# 1. Start Here
-
-If you are reviewing for the first time:
-
-1) architecture-overview.md  
-2) state-machine.md  
-3) invariants.md  
-
-These define the core behavioral contract.
+- **Core** — protocol architecture, invariants, state machine, security, rationale  
+- **Demo** — contract‑first demonstration package with scenario, output format, and validation tools
 
 ---
 
-# 2. Concept & Rationale
+# 1. Core Architecture (`docs/core/`)
 
-- protocol-rationale.md  
-- comparative-analysis.md  
+Foundational documents describing how Jumping VPN works at the protocol level.
 
-These explain:
+### Lifecycle & Behavior
+- `state-machine.md`
+- `invariants.md`
+- `reconnect.md`
+- `reason-codes.md`
+- `control-plane-sequence.md`
 
-- Why Jumping VPN exists
-- How it differs from WireGuard / IPsec / QUIC
-- What problem it is solving
+### Security & Threat Modeling
+- `security-boundary.md`
+- `threat-model.md`
+- `attack-scenarios.md`
+- `security-review-plan.md`
 
----
+### Performance & Evaluation
+- `performance-model.md`
+- `benchmark-plan.md`
+- `integration-evaluation.md`
 
-# 3. Formal Specification Layer
+### Design Rationale
+- `protocol-rationale.md`
+- `design-decisions.md`
+- `comparative-analysis.md`
+- `comparison-model.md`
+- `limitations.md`
+- `non-goals.md`
 
-- formal-spec-outline.md  
-- formal-properties.md  
-- state-machine.md  
-- invariants.md  
+### Use Cases & Scenarios
+- `use-case-fintech-failover.md`
+- `test-scenarios.md`
 
-Defines:
-
-- Explicit state transitions
-- Hard invariants
-- Deterministic guarantees
-- Bounded recovery model
-
----
-
-# 4. Security Model
-
-- threat-model.md  
-- security-model-deep-dive.md  
-- attack-scenarios.md  
-
-Covers:
-
-- Adversary assumptions
-- Replay handling
-- Reattach safety
-- Cluster ownership safety
-- Abuse and DoS scenarios
+### Roadmap
+- `roadmap.md`
+- `production-readiness-checklist.md`
+- `production-readiness-gap.md`
 
 ---
 
-# 5. Production Perspective
+# 2. Demo Package (`docs/demo/`)
 
-- reference-implementation-outline.md  
-- production-readiness-checklist.md  
-- production-readiness-gap.md  
+A contract‑first demonstration of Jumping VPN behavior.
 
-Clarifies:
+### Specification & Behavior
+- `DEMO_SPEC.md`
+- `DEMO_SCENARIO.md`
+- `DEMO_OUTPUT_FORMAT.md`
 
-- What exists architecturally
-- What is missing for production
-- Honest boundary of current stage
+### Validation & Status
+- `STATUS.md`
+- `REVIEW_CHECKLIST.md`
 
----
+### Expected Output
+- `DEMO_TIMELINE.jsonl`
 
-# 6. Evaluation Framework
-
-- integration-evaluation.md  
-- benchmark-plan.md  
-- test-scenarios.md  
-
-Defines:
-
-- How to evaluate determinism
-- How to test volatility
-- What measurable artifacts should exist
-- How to compare against baseline VPNs
+### Demo Index
+- `README.md`
 
 ---
 
-# 7. Whitepaper Draft
+# 3. Mutation Logs (`docs/MutationLogs/`)
 
-- whitepaper-draft.md  
-
-Narrative version of the architecture,
-suitable for higher-level technical review.
+Chronological logs describing protocol evolution, conceptual mutations,
+and architectural shifts.
 
 ---
 
-# 8. Mutation Logs
+# Summary
 
-Located in:
+This documentation set defines:
 
-docs/MutationLogs/
+- the protocol  
+- the invariants  
+- the reconnect model  
+- the security boundary  
+- the demo contract  
+- the expected behavior  
+- the roadmap  
 
-These document architectural evolution
-and behavioral reasoning over time.
-
----
-
-# 9. Proof of Concept
-
-Located in:
-
-poc/
-
-Includes:
-
-- real_udp_prototype.py
-- demo.py
-- supporting modules
-
-Purpose:
-
-Demonstrate behavioral claim:
-
-Session survives transport death
-without silent identity reset.
-
-This is not production crypto.
-
----
-
-# 10. Repository Scope Reminder
-
-This repository represents:
-
-Architectural validation.
-
-It does not represent:
-
-- Production-grade VPN release
-- Hardened distributed system
-- Performance-certified implementation
-- Cryptographic audit
-
----
-
-# 11. Review Philosophy
-
-The architecture should be evaluated against:
-
-- Deterministic behavior
-- Explicit state transitions
-- Bounded recovery
-- No dual-active ambiguity
-- No silent identity reset
-- Clear failure semantics
-
-If these hold,
-the behavioral model is internally coherent.
-
----
-
-Session is the anchor.  
-Transport is volatile.  
-Determinism is the goal.
+Jumping VPN is identity‑anchored and transport‑volatile.
