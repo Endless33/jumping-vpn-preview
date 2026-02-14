@@ -1,6 +1,7 @@
 from .events import Event
 from .state_machine import StateMachine, State
 from .emitter import Emitter
+from .volatility import VolatilitySimulator
 
 
 class DemoEngine:
@@ -9,6 +10,7 @@ class DemoEngine:
         self.ts = 0
         self.sm = StateMachine()
         self.emitter = Emitter(output_path)
+        self.vol = VolatilitySimulator()
 
     def tick(self, ms: int):
         self.ts += ms
@@ -29,8 +31,12 @@ class DemoEngine:
 
         # PHASE 2 — VOLATILITY
         self.tick(5000)
+        loss = self.vol.loss_spike()
+        jitter = self.vol.jitter_spike()
+        rtt = self.vol.rtt_spike()
+
         self.sm.transition(State.VOLATILE, "loss_threshold_exceeded")
-        self.emit("VOLATILITY_SIGNAL", loss_pct=7.2)
+        self.emit("VOLATILITY_SIGNAL", loss_pct=loss, jitter_ms=jitter, rtt_ms=rtt)
 
         # PHASE 3 — DEGRADED
         self.tick(1000)
