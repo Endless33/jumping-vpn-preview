@@ -3,6 +3,8 @@ from .state_machine import StateMachine, State
 from .emitter import Emitter
 from .volatility import VolatilitySimulator
 from .policy import Policy
+from .scoring import Scoring
+from .candidates import CandidateGenerator
 
 
 class DemoEngine:
@@ -13,6 +15,8 @@ class DemoEngine:
         self.emitter = Emitter(output_path)
         self.vol = VolatilitySimulator()
         self.policy = Policy()
+        self.scoring = Scoring()
+        self.candidates = CandidateGenerator()
 
     def tick(self, ms: int):
         self.ts += ms
@@ -46,19 +50,31 @@ class DemoEngine:
             self.sm.transition(State.DEGRADED, "quality_below_threshold")
             self.emit("DEGRADED_ENTERED")
 
-        # PHASE 4 — REATTACHING
+        # PHASE 4 — MULTIPATH SCORING
+        cand_list = self.candidates.list_candidates()
+        cand_scores = {}
+
+        for c in cand_list:
+            cand_scores[c] = self.scoring.score(loss, jitter, rtt)
+
+        best = self.scoring.pick_best(cand_scores)
+
+        self.emit("CANDIDATE_SCORES", scores=cand_scores)
+        self.emit("BEST_CANDIDATE_SELECTED", candidate=best)
+
+        # PHASE 5 — REATTACHING
         self.tick(1000)
-        self.emit("REATTACH_REQUEST", candidate="udp:B")
+        self.emit("REATTACH_REQUEST", candidate=best)
         self.emit("REATTACH_PROOF", proof="ok")
         self.sm.transition(State.REATTACHING, "preferred_path_changed")
-        self.emit("TRANSPORT_SWITCH", from_="udp:A", to="udp:B")
+        self.emit("TRANSPORT_SWITCH", from_="udp:A", to=best)
 
-        # PHASE 5 — RECOVERING
+        # PHASE 6 — RECOVERING
         self.tick(2000)
         self.sm.transition(State.RECOVERING, "new_transport_validated")
         self.emit("RECOVERY_SIGNAL")
 
-        # PHASE 6 — BACK TO ATTACHED
+        # PHASE 7 — BACK TO ATTACHED
         if self.policy.allow_recovery(rtt):
             self.tick(2000)
             self.sm.transition(State.ATTACHED, "metrics_stabilized")
