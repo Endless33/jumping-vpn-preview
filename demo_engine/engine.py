@@ -4,6 +4,7 @@ from .emitter import Emitter
 from .volatility import VolatilitySimulator
 from .policy import Policy
 from .scoring import Scoring
+from .adaptive_score import AdaptiveScore
 from .candidates import CandidateGenerator
 from .audit import Audit
 from .recovery import RecoveryWindow
@@ -27,6 +28,7 @@ class DemoEngine:
         self.vol = VolatilitySimulator()
         self.policy = Policy()
         self.scoring = Scoring()
+        self.adaptive = AdaptiveScore()
         self.candidates = CandidateGenerator()
         self.audit = Audit()
         self.recovery = RecoveryWindow(window_ms=2000)
@@ -86,10 +88,19 @@ class DemoEngine:
         self.flow.degrade(loss)
         self.health.update(loss, jitter, rtt)
 
+        # update adaptive model
+        self.adaptive.update_history(loss, jitter, rtt)
+        self.adaptive.adapt()
+
         self.sm.transition(State.VOLATILE, "loss_threshold_exceeded")
         self.emit("VOLATILITY_SIGNAL",
                   **self.health.snapshot(),
                   **self.flow.snapshot(),
+                  adaptive_weights={
+                      "loss": self.adaptive.loss_weight,
+                      "jitter": self.adaptive.jitter_weight,
+                      "rtt": self.adaptive.rtt_weight
+                  },
                   hysteresis_margin=self.hysteresis_decay.get_margin())
 
         self.simulate_packets(5)
@@ -101,12 +112,23 @@ class DemoEngine:
             self.emit("DEGRADED_ENTERED",
                       **self.health.snapshot(),
                       **self.flow.snapshot(),
+                      adaptive_weights={
+                          "loss": self.adaptive.loss_weight,
+                          "jitter": self.adaptive.jitter_weight,
+                          "rtt": self.adaptive.rtt_weight
+                      },
                       hysteresis_margin=self.hysteresis_decay.get_margin())
 
         # PHASE 4 — MULTIPATH DECISION
         cand_list = self.candidates.list_candidates()
-        raw_scores = {c: self.scoring.score(loss, jitter, self.health.rtt_smoothed.get()) for c in cand_list}
-        weighted_scores = self.weights.apply(raw_scores)
+
+        # adaptive scoring
+        adaptive_scores = {
+            c: self.adaptive.score(loss, jitter, self.health.rtt_smoothed.get())
+            for c in cand_list
+        }
+
+        weighted_scores = self.weights.apply(adaptive_scores)
         best = max(weighted_scores, key=weighted_scores.get)
 
         delay_ok = self.delay_switch.should_switch(self.health.rtt_smoothed.get())
@@ -122,7 +144,7 @@ class DemoEngine:
                       hysteresis_margin=self.hysteresis_decay.get_margin())
             best = "udp:A"
 
-        self.emit("CANDIDATE_SCORES_RAW", scores=raw_scores)
+        self.emit("CANDIDATE_SCORES_ADAPTIVE", scores=adaptive_scores)
         self.emit("CANDIDATE_SCORES_WEIGHTED", scores=weighted_scores)
         self.emit("BEST_CANDIDATE_SELECTED", candidate=best)
 
@@ -146,6 +168,11 @@ class DemoEngine:
         self.emit("RECOVERY_SIGNAL",
                   **self.health.snapshot(),
                   **self.flow.snapshot(),
+                  adaptive_weights={
+                      "loss": self.adaptive.loss_weight,
+                      "jitter": self.adaptive.jitter_weight,
+                      "rtt": self.adaptive.rtt_weight
+                  },
                   hysteresis_margin=self.hysteresis_decay.get_margin())
 
         # PHASE 8 — RECOVERY WINDOW
@@ -157,6 +184,11 @@ class DemoEngine:
                       elapsed_ms=self.recovery.elapsed,
                       **self.health.snapshot(),
                       **self.flow.snapshot(),
+                      adaptive_weights={
+                          "loss": self.adaptive.loss_weight,
+                          "jitter": self.adaptive.jitter_weight,
+                          "rtt": self.adaptive.rtt_weight
+                      },
                       hysteresis_margin=self.hysteresis_decay.get_margin())
 
         # PHASE 9 — BACK TO ATTACHED
@@ -164,6 +196,11 @@ class DemoEngine:
         self.emit("ATTACHED_RESTORED",
                   **self.health.snapshot(),
                   **self.flow.snapshot(),
+                  adaptive_weights={
+                      "loss": self.adaptive.loss_weight,
+                      "jitter": self.adaptive.jitter_weight,
+                      "rtt": self.adaptive.rtt_weight
+                  },
                   hysteresis_margin=self.hysteresis_decay.get_margin())
 
         # PHASE 10 — SESSION EXPIRY
