@@ -151,6 +151,36 @@ Includes:
 
 ---
 
+# Proof of behavioral continuity
+
+The repository includes a behavioral proof trace demonstrating deterministic session continuity under transport volatility.
+
+See:
+
+docs/DEMO_TRACE.md
+
+This file shows a complete event sequence including:
+
+- session creation
+- transport attachment
+- volatility detection
+- transport switch
+- invariant validation
+- recovery completion
+
+Key verified properties:
+
+- No identity reset
+- No renegotiation
+- No silent state mutation
+- Explicit transport switch
+- Deterministic state transitions
+- Session continuity preserved
+
+This provides observable evidence of the protocol's core behavioral guarantees.
+
+---
+
 # Prototype code
 
 Prototype implementation is located in:
@@ -180,12 +210,14 @@ Key observable properties:
 - transport switch events
 - recovery windows
 - identity continuity
+- invariant validation events
 
 This enables:
 
 - debugging
 - auditing
 - verification
+- behavioral validation
 
 ---
 
@@ -199,6 +231,8 @@ Session identity persists.
 
 Transport changes are controlled, bounded, and auditable.
 
+Identity continuity is preserved across transport mutation.
+
 ---
 
 # Current status
@@ -208,14 +242,19 @@ This repository represents:
 - architectural specification
 - behavioral model
 - prototype transport engine
-- review-ready documentation
+- deterministic state machine definition
+- protocol control-plane contract
+- observable behavioral proof trace
 
 Not yet included:
 
 - production cryptography
 - TUN integration
 - production hardening
+- kernel integration
 - full benchmark suite
+
+This is architectural validation stage.
 
 ---
 
@@ -229,6 +268,10 @@ It allows engineers to evaluate:
 - identity semantics
 - recovery determinism
 - transport abstraction correctness
+- invariant preservation
+- failure behavior under volatility
+
+This is a reviewable protocol model.
 
 ---
 
@@ -237,6 +280,10 @@ It allows engineers to evaluate:
 This is an engineering research and protocol design project.
 
 The goal is to explore deterministic session continuity under volatile transport conditions.
+
+The repository documents architectural model, invariants, state machine, and behavioral proof.
+
+The system is designed to be auditable, deterministic, and observable.
 
 ---
 
@@ -248,6 +295,15 @@ Engineers are encouraged to review:
 - state machine safety
 - transport replacement logic
 - attack surface
+- failure handling correctness
+- deterministic recovery behavior
+
+Primary entry points:
+
+docs/invariants.md  
+docs/state-machine.md  
+docs/control-plane.md  
+docs/DEMO_TRACE.md  
 
 ---
 
@@ -258,6 +314,10 @@ Jumping VPN is a protocol model where:
 Session is stable.  
 Transport is replaceable.  
 Recovery is explicit.  
-Identity persists.
+Identity persists.  
+
+Behavior is deterministic.  
+Transitions are auditable.  
+Continuity is preserved.
 
 Start reading from docs/invariants.md
