@@ -10,6 +10,7 @@ from .recovery import RecoveryWindow
 from .flow_control import FlowControl
 from .transport_health import TransportHealth
 from .weights import CandidateWeights
+from .session_lifetime import SessionLifetime
 
 
 class DemoEngine:
@@ -27,9 +28,15 @@ class DemoEngine:
         self.flow = FlowControl()
         self.health = TransportHealth()
         self.weights = CandidateWeights()
+        self.lifetime = SessionLifetime()
 
     def tick(self, ms: int):
         self.ts += ms
+        self.lifetime.tick(ms)
+
+        if self.lifetime.should_heartbeat():
+            self.emit("HEARTBEAT", lifetime_ms=self.lifetime.elapsed)
+            self.lifetime.consume_heartbeat()
 
     def emit(self, event: str, **data):
         ev = Event(
@@ -112,5 +119,12 @@ class DemoEngine:
         self.emit("ATTACHED_RESTORED",
                   **self.health.snapshot(),
                   **self.flow.snapshot())
+
+        # PHASE 10 — SESSION EXPIRY
+        while not self.lifetime.expired():
+            self.tick(1000)
+
+        self.sm.transition(State.TERMINATED, "session_expired")
+        self.emit("SESSION_EXPIRED", lifetime_ms=self.lifetime.elapsed)
 
         self.emitter.close()
