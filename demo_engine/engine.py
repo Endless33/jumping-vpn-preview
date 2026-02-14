@@ -11,6 +11,7 @@ from .flow_control import FlowControl
 from .transport_health import TransportHealth
 from .weights import CandidateWeights
 from .session_lifetime import SessionLifetime
+from .packet_sim import PacketSimulator
 
 
 class DemoEngine:
@@ -29,6 +30,7 @@ class DemoEngine:
         self.health = TransportHealth()
         self.weights = CandidateWeights()
         self.lifetime = SessionLifetime()
+        self.packets = PacketSimulator()
 
     def tick(self, ms: int):
         self.ts += ms
@@ -47,10 +49,22 @@ class DemoEngine:
         )
         self.emitter.emit(ev)
 
+    def simulate_packets(self, count: int):
+        for i in range(count):
+            result = self.packets.send_packet(i)
+            if result is None:
+                self.emit("PACKET_LOST", packet_id=i)
+        delivered = self.packets.flush()
+        for packet_id, delay in delivered:
+            self.emit("PACKET_DELIVERED", packet_id=packet_id, delay_ms=delay)
+
     def run(self):
         # PHASE 1 — BIRTH → ATTACHED
         self.sm.transition(State.ATTACHED, "initial_attach")
         self.emit("SESSION_CREATED", state="ATTACHED", **self.flow.snapshot())
+
+        # PACKET SIMULATION (initial)
+        self.simulate_packets(5)
 
         # PHASE 2 — VOLATILITY
         self.tick(5000)
@@ -65,6 +79,9 @@ class DemoEngine:
         self.emit("VOLATILITY_SIGNAL",
                   **self.health.snapshot(),
                   **self.flow.snapshot())
+
+        # PACKET SIMULATION (under volatility)
+        self.simulate_packets(5)
 
         # PHASE 3 — DEGRADED
         if self.policy.allow_switch(loss):
@@ -96,6 +113,9 @@ class DemoEngine:
         self.emit("REATTACH_PROOF", proof="ok")
         self.sm.transition(State.REATTACHING, "preferred_path_changed")
         self.emit("TRANSPORT_SWITCH", from_="udp:A", to=best)
+
+        # PACKET SIMULATION (after switch)
+        self.simulate_packets(5)
 
         # PHASE 7 — RECOVERING
         self.tick(500)
