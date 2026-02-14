@@ -13,6 +13,8 @@ from .weights import CandidateWeights
 from .session_lifetime import SessionLifetime
 from .packet_sim import PacketSimulator
 from .hysteresis import Hysteresis
+from .delay_switch import DelaySwitchLogic
+from .loss_switch import LossSwitchLogic
 
 
 class DemoEngine:
@@ -33,6 +35,8 @@ class DemoEngine:
         self.lifetime = SessionLifetime()
         self.packets = PacketSimulator()
         self.hysteresis = Hysteresis(margin=5.0)
+        self.delay_switch = DelaySwitchLogic(rtt_threshold_ms=180.0)
+        self.loss_switch = LossSwitchLogic(loss_threshold_pct=5.0)
 
     def tick(self, ms: int):
         self.ts += ms
@@ -93,16 +97,29 @@ class DemoEngine:
                       **self.health.snapshot(),
                       **self.flow.snapshot())
 
-        # PHASE 4 — MULTIPATH SCORING + WEIGHTING + HYSTERESIS
+        # PHASE 4 — MULTIPATH SCORING + WEIGHTING
         cand_list = self.candidates.list_candidates()
         raw_scores = {c: self.scoring.score(loss, jitter, self.health.rtt_smoothed.get()) for c in cand_list}
         weighted_scores = self.weights.apply(raw_scores)
         best = max(weighted_scores, key=weighted_scores.get)
 
-        # Hysteresis check
-        if not self.hysteresis.allow_switch(self.health.score, weighted_scores[best]):
-            self.emit("HYSTERESIS_BLOCKED", candidate=best, score=weighted_scores[best])
-            best = "udp:A"  # stay on current path
+        # DELAY-BASED SWITCH CHECK
+        delay_ok = self.delay_switch.should_switch(self.health.rtt_smoothed.get())
+
+        # LOSS-BASED SWITCH CHECK
+        loss_ok = self.loss_switch.should_switch(loss)
+
+        # HYSTERESIS CHECK
+        hysteresis_ok = self.hysteresis.allow_switch(self.health.score, weighted_scores[best])
+
+        # FINAL DECISION
+        if not (delay_ok or loss_ok) or not hysteresis_ok:
+            self.emit("SWITCH_BLOCKED",
+                      candidate=best,
+                      delay_ok=delay_ok,
+                      loss_ok=loss_ok,
+                      hysteresis_ok=hysteresis_ok)
+            best = "udp:A"
 
         self.emit("CANDIDATE_SCORES_RAW", scores=raw_scores)
         self.emit("CANDIDATE_SCORES_WEIGHTED", scores=weighted_scores)
