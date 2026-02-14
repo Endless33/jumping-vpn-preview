@@ -6,6 +6,7 @@ from .policy import Policy
 from .scoring import Scoring
 from .candidates import CandidateGenerator
 from .audit import Audit
+from .recovery import RecoveryWindow
 
 
 class DemoEngine:
@@ -19,6 +20,7 @@ class DemoEngine:
         self.scoring = Scoring()
         self.candidates = CandidateGenerator()
         self.audit = Audit()
+        self.recovery = RecoveryWindow(window_ms=2000)
 
     def tick(self, ms: int):
         self.ts += ms
@@ -74,14 +76,18 @@ class DemoEngine:
         self.emit("TRANSPORT_SWITCH", from_="udp:A", to=best)
 
         # PHASE 7 — RECOVERING
-        self.tick(2000)
+        self.tick(500)
         self.sm.transition(State.RECOVERING, "new_transport_validated")
         self.emit("RECOVERY_SIGNAL")
 
-        # PHASE 8 — BACK TO ATTACHED
-        if self.policy.allow_recovery(rtt):
-            self.tick(2000)
-            self.sm.transition(State.ATTACHED, "metrics_stabilized")
-            self.emit("ATTACHED_RESTORED")
+        # PHASE 8 — RECOVERY WINDOW
+        while not self.recovery.is_stable():
+            self.tick(500)
+            self.recovery.tick(500)
+            self.emit("RECOVERY_PROGRESS", elapsed_ms=self.recovery.elapsed)
+
+        # PHASE 9 — BACK TO ATTACHED
+        self.sm.transition(State.ATTACHED, "metrics_stabilized")
+        self.emit("ATTACHED_RESTORED")
 
         self.emitter.close()
