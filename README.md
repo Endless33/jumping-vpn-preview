@@ -1,11 +1,17 @@
 # 🧬 Jumping VPN — Architectural Preview
 
-Jumping VPN is a **session-centric VPN architecture** designed for environments where **transport volatility** is the default state of the network.
+Jumping VPN is a **session‑centric VPN architecture** built for environments where **transport volatility is the norm**, not an exception.
 
-Traditional VPN systems often assume transport stability.  
-Jumping VPN assumes instability — and models it explicitly.
+Traditional VPNs bind identity to a single transport.  
+Jumping VPN binds identity to a **persistent session**, while transports remain **replaceable, volatile attachments**.
 
-This repository contains **architectural documentation**, **behavioral models**, **demo contract**, and **minimal proof-of-concept prototypes**.
+This repository contains:
+
+- architectural documentation  
+- behavioral models  
+- demo contract (contract‑first)  
+- mutation logs  
+- minimal behavioral prototypes  
 
 It is **not** a production release.
 
@@ -18,182 +24,163 @@ behavior is defined before implementation.
 
 Demo documents:
 
-- [`DEMO_SPEC.md`](docs/demo/DEMO_SPEC.md) — what the demo must show  
-- [`DEMO_OUTPUT_FORMAT.md`](docs/demo/DEMO_OUTPUT_FORMAT.md) — JSONL event format  
-- [`STATUS.md`](docs/demo/STATUS.md) — what exists today / what is not public  
-- [`REVIEW_CHECKLIST.md`](docs/demo/REVIEW_CHECKLIST.md) — how to validate the demo  
+- [`DEMO_SPEC.md`](docs/demo/DEMO_SPEC.md)
+- [`DEMO_OUTPUT_FORMAT.md`](docs/demo/DEMO_OUTPUT_FORMAT.md)
+- [`DEMO_SCENARIO.md`](docs/demo/DEMO_SCENARIO.md)
+- [`DEMO_TIMELINE.jsonl`](docs/demo/DEMO_TIMELINE.jsonl)
+- [`STATUS.md`](docs/demo/STATUS.md)
+- [`REVIEW_CHECKLIST.md`](docs/demo/REVIEW_CHECKLIST.md)
 
-The demo contract defines:
+The demo contract validates:
 
 - identity anchoring  
-- volatility handling  
-- flow‑control reaction  
+- volatility modeling  
 - multipath scoring  
+- bounded adaptation  
 - deterministic transport switch  
 - recovery back to `ATTACHED`  
 
-Session is the anchor.  
-Transport is volatile.
+**Session is the anchor.  
+Transport is volatile.**
 
 ---
 
 ## 🔎 Core Thesis
 
-Modern networks are volatile:
+Modern networks are inherently unstable:
 
-- paths fail  
-- packet loss spikes  
 - mobile networks flap  
 - NAT mappings expire  
-- cross-border routes degrade  
+- cross‑border routes degrade  
+- packet loss spikes  
+- paths die unpredictably  
 
-Many VPN systems bind identity to transport.
+Most VPNs treat this as failure.  
+Jumping VPN treats it as **modeled behavior**.
 
-Jumping VPN separates:
+### Separation of Concerns
 
-- **Session identity (persistent)**  
-- **Transport binding (replaceable)**  
+- **Session identity** — persistent, cryptographically anchored  
+- **Transport binding** — volatile, replaceable, auditable  
 
-Transport death does not imply session death (within defined bounds).
+Transport death ≠ session death (within bounded policy).
 
 ---
 
 ## 🧠 Architectural Model
 
-Jumping VPN is defined by **behavior over time**.
+Jumping VPN is defined by **behavior over time**, not by static configuration.
 
-### Session-Centric Identity
+### Session‑Centric Identity
 
 The session is the source of truth:
 
-- Identity belongs to the session  
-- Transport is an attachment  
-- Reattachment preserves identity continuity  
+- identity belongs to the session  
+- transport is an attachment  
+- reattachment preserves continuity  
 
 ### Deterministic Recovery
 
 Transport failover is:
 
 - explicit  
-- policy-bounded  
-- rate-limited  
-- logged  
+- reason‑coded  
+- rate‑limited  
+- policy‑bounded  
 - auditable  
 
 No silent renegotiation.  
-No uncontrolled session resets.
+No uncontrolled resets.
 
 ### Volatility as State
 
-Transport instability is represented in the state machine:
+Instability is represented explicitly:
 
 - `BIRTH`  
 - `ATTACHED`  
 - `VOLATILE`  
 - `DEGRADED`  
+- `REATTACHING`  
 - `RECOVERING`  
 - `TERMINATED`  
 
-Transitions are deterministic and reason-coded.
+Transitions are deterministic and logged.
 
 ---
 
 ## 📂 Repository Structure
 
-`
-.
-├── docs/
-│   ├── index.md
-│   ├── reviewer-guide.md
-│   ├── architecture-overview.md
-│   ├── state-machine.md
-│   ├── invariants.md
-│   ├── threat-model.md
-│   ├── non-goals.md
-│   ├── limitations.md
-│   ├── reason-codes.md
-│   ├── MutationLogs/
-│   └── demo/
-│       ├── DEMO_SPEC.md
-│       ├── DEMOOUTPUTFORMAT.md
-│       ├── STATUS.md
-│       └── REVIEW_CHECKLIST.md
-├── spec/
-│   └── vrp-preview.md
-├── poc/
-│   ├── demo.py
-│   ├── session.py
-│   ├── transport.py
-│   ├── policy.py
-│   ├── logger.py
-│   ├── realudpprototype.py
-│   └── README_udp.md
-└── core/
-    └── README.md
-`
+. ├── docs/ │   ├── index.md │   ├── architecture-overview.md │   ├── reviewer-guide.md │   ├── core/ │   │   ├── state-machine.md │   │   ├── invariants.md │   │   ├── reconnect.md │   │   ├── reason-codes.md │   │   ├── security-boundary.md │   │   ├── threat-model.md │   │   ├── limitations.md │   │   ├── non-goals.md │   │   ├── design-decisions.md │   │   ├── protocol-rationale.md │   │   ├── performance-model.md │   │   ├── benchmark-plan.md │   │   ├── integration-evaluation.md │   │   ├── production-readiness-checklist.md │   │   └── production-readiness-gap.md │   ├── MutationLogs/ │   └── demo/ │       ├── DEMO_SPEC.md │       ├── DEMO_OUTPUT_FORMAT.md │       ├── DEMO_SCENARIO.md │       ├── DEMO_TIMELINE.jsonl │       ├── STATUS.md │       └── REVIEW_CHECKLIST.md ├── spec/ │   └── vrp-preview.md ├── poc/ │   ├── demo.py │   ├── session.py │   ├── transport.py │   ├── policy.py │   ├── logger.py │   ├── realudpprototype.py │   └── README_udp.md └── core/ └── README.md
 
-`core/` is a **production-oriented skeleton** intended to encode invariants and module boundaries.
+`core/` defines **production‑oriented boundaries and invariants**.  
+`docs/` defines **architecture, behavior, and demo contract**.  
+`poc/` provides **behavioral validation**, not production crypto.
 
 ---
 
 ## 🧬 Mutation Logs
 
-Mutation Logs document architectural evolution and behavioral modeling.
+Mutation Logs document the evolution of:
 
-They describe how session lifecycle, volatility handling, and bounded adaptation matured over time.
+- session lifecycle  
+- volatility modeling  
+- bounded adaptation  
+- reconnect semantics  
+- protocol invariants  
+
+They serve as architectural archaeology.
 
 ---
 
 ## 🌐 Real UDP Prototype (Behavioral Validation)
 
-A minimal real UDP client/server prototype demonstrates:
+A minimal UDP prototype demonstrates:
 
-- Session creation (`session_id`)  
-- Transport death (socket close / port change)  
-- Explicit `REATTACH_REQUEST`  
-- Verified session-bound proof  
-- Server-side `TransportSwitch`  
-- Continued session without reset (within TTL)  
+- session creation  
+- transport death  
+- explicit reattach  
+- proof‑based validation  
+- server‑side `TransportSwitch`  
+- continuity without identity reset  
 
 See:
 
-- `poc/real_udp_prototype.py`  
+- `poc/realudpprototype.py`  
 - `poc/README_udp.md`  
 
-This is behavioral validation only.  
-It is not production-grade cryptography.
+This is **behavioral validation**, not production cryptography.
 
 ---
 
 ## 🛡 Threat Model & Boundaries
 
-Jumping VPN explicitly defines:
+Jumping VPN defines:
 
 - adversary assumptions  
-- allowed state transitions  
 - deterministic failure boundaries  
+- allowed transitions  
 - bounded adaptation policies  
 
-Recommended:
+Recommended reading:
 
-- `docs/threat-model.md`  
-- `docs/security-boundary.md`  
-- `docs/invariants.md`  
-- `docs/state-machine.md`  
+- `docs/core/threat-model.md`  
+- `docs/core/security-boundary.md`  
+- `docs/core/invariants.md`  
+- `docs/core/state-machine.md`  
 
 ---
 
-## 🚫 Explicit Non-Goals
+## 🚫 Explicit Non‑Goals
 
-Jumping VPN does not claim:
+Jumping VPN does **not** aim to provide:
 
-- Tor-level anonymity  
-- censorship bypass guarantees  
+- anonymity  
+- censorship bypass  
 - endpoint compromise protection  
-- anti-forensics capabilities  
+- anti‑forensics  
 - universal VPN replacement  
 
-Scope is intentionally constrained to:
+Scope is intentionally narrow:
 
 **session continuity under transport volatility**
 
@@ -204,12 +191,12 @@ Scope is intentionally constrained to:
 Active research areas:
 
 - distributed session ownership  
-- clustered state synchronization  
+- clustered state replication  
 - formal verification  
+- QUIC‑based transport experiments  
 - performance under high churn  
-- QUIC-based transport experiments  
 
-This repository prioritizes **behavioral correctness** over feature completeness.
+Behavioral correctness takes priority.
 
 ---
 
@@ -217,37 +204,36 @@ This repository prioritizes **behavioral correctness** over feature completeness
 
 Relevant for:
 
-- infrastructure teams in volatile mobile environments  
-- fintech platforms suffering session collapse  
+- mobile infrastructure teams  
+- fintech platforms with session collapse issues  
 - security architects designing deterministic recovery  
 - operators exploring transport abstraction  
 
 ---
 
-## 🧭 Project Philosophy
+## 🧭 Philosophy
 
-Jumping VPN is not driven by market cycles.  
-It is an architectural thesis.
+Jumping VPN is an architectural thesis:
 
-Behavior first.  
-Contracts first.  
-Rigor over hype.
+- behavior first  
+- contracts first  
+- rigor over hype  
 
-Architecture does not require permission to exist.  
+Architecture does not require permission.  
 It requires consistency.
 
 ---
 
 ## 📈 Status
 
-Jumping VPN is in **architectural validation** phase.
+Jumping VPN is in **architectural validation**.
 
 This repository:
 
-- is not production-ready  
-- does not contain hardened cryptography  
-- does not expose full protocol internals  
-- represents staged documentation and behavioral modeling  
+- is not production‑ready  
+- does not include hardened cryptography  
+- exposes staged documentation  
+- focuses on behavioral modeling  
 
 ---
 
@@ -255,21 +241,21 @@ This repository:
 
 Open to discussions on:
 
-- deterministic transport recovery  
+- deterministic recovery  
 - bounded adaptation  
 - session persistence  
-- operator-grade observability  
+- operator‑grade observability  
 
-📧 Contact: **riabovasvitalijus@gmail.com**
+📧 **riabovasvitalijus@gmail.com**
 
 ---
 
 ## Final Principle
 
-Transport instability is not an anomaly.  
-It is the default condition of modern networks.
+Transport instability is not an anomaly —  
+it is the default condition of modern networks.
 
-Jumping VPN treats volatility as modeled behavior — not as fatal error.
+Jumping VPN treats volatility as modeled behavior, not as failure.
 
 **Session remains the anchor.  
 Transports come and go.**
