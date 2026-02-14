@@ -5,6 +5,7 @@ from .volatility import VolatilitySimulator
 from .policy import Policy
 from .scoring import Scoring
 from .candidates import CandidateGenerator
+from .audit import Audit
 
 
 class DemoEngine:
@@ -17,6 +18,7 @@ class DemoEngine:
         self.policy = Policy()
         self.scoring = Scoring()
         self.candidates = CandidateGenerator()
+        self.audit = Audit()
 
     def tick(self, ms: int):
         self.ts += ms
@@ -52,29 +54,31 @@ class DemoEngine:
 
         # PHASE 4 — MULTIPATH SCORING
         cand_list = self.candidates.list_candidates()
-        cand_scores = {}
-
-        for c in cand_list:
-            cand_scores[c] = self.scoring.score(loss, jitter, rtt)
-
+        cand_scores = {c: self.scoring.score(loss, jitter, rtt) for c in cand_list}
         best = self.scoring.pick_best(cand_scores)
 
         self.emit("CANDIDATE_SCORES", scores=cand_scores)
         self.emit("BEST_CANDIDATE_SELECTED", candidate=best)
 
-        # PHASE 5 — REATTACHING
+        # PHASE 5 — AUDIT BEFORE SWITCH
+        identity_ok = self.audit.check_identity_reset(self.session_id, self.session_id)
+        dual_ok = self.audit.check_dual_binding(["udp:A"])
+
+        self.emit("AUDIT_EVENT", identity_ok=identity_ok, dual_binding_ok=dual_ok)
+
+        # PHASE 6 — REATTACHING
         self.tick(1000)
         self.emit("REATTACH_REQUEST", candidate=best)
         self.emit("REATTACH_PROOF", proof="ok")
         self.sm.transition(State.REATTACHING, "preferred_path_changed")
         self.emit("TRANSPORT_SWITCH", from_="udp:A", to=best)
 
-        # PHASE 6 — RECOVERING
+        # PHASE 7 — RECOVERING
         self.tick(2000)
         self.sm.transition(State.RECOVERING, "new_transport_validated")
         self.emit("RECOVERY_SIGNAL")
 
-        # PHASE 7 — BACK TO ATTACHED
+        # PHASE 8 — BACK TO ATTACHED
         if self.policy.allow_recovery(rtt):
             self.tick(2000)
             self.sm.transition(State.ATTACHED, "metrics_stabilized")
