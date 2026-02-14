@@ -29,3 +29,15 @@ Each line is a JSON object with:
 {"ts_ms":3,"event":"TRANSPORT_SWITCH","session_id":"s_x","reason":"PREFERRED_PATH_CHANGED","details":{"from":"udp:A","to":"udp:B"}}
 {"ts_ms":4,"event":"AUDIT_EVENT","session_id":"s_x","details":{"check":"NO_IDENTITY_RESET","result":"PASS"}}
 {"ts_ms":5,"event":"STATE_CHANGE","session_id":"s_x","details":{"from":"RECOVERING","to":"ATTACHED"}}
+
+Notes:
+
+- The demo output must be deterministic and auditable
+- Consumers must be able to verify:
+  - stable SessionID
+  - monotonic state_version
+  - explicit transitions
+  - explicit switch reasons
+
+This format is intentionally minimal and readable.
+`
