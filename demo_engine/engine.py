@@ -12,6 +12,7 @@ from .transport_health import TransportHealth
 from .weights import CandidateWeights
 from .session_lifetime import SessionLifetime
 from .packet_sim import PacketSimulator
+from .hysteresis import Hysteresis
 
 
 class DemoEngine:
@@ -31,6 +32,7 @@ class DemoEngine:
         self.weights = CandidateWeights()
         self.lifetime = SessionLifetime()
         self.packets = PacketSimulator()
+        self.hysteresis = Hysteresis(margin=5.0)
 
     def tick(self, ms: int):
         self.ts += ms
@@ -91,11 +93,16 @@ class DemoEngine:
                       **self.health.snapshot(),
                       **self.flow.snapshot())
 
-        # PHASE 4 — MULTIPATH SCORING + WEIGHTING
+        # PHASE 4 — MULTIPATH SCORING + WEIGHTING + HYSTERESIS
         cand_list = self.candidates.list_candidates()
         raw_scores = {c: self.scoring.score(loss, jitter, self.health.rtt_smoothed.get()) for c in cand_list}
         weighted_scores = self.weights.apply(raw_scores)
         best = max(weighted_scores, key=weighted_scores.get)
+
+        # Hysteresis check
+        if not self.hysteresis.allow_switch(self.health.score, weighted_scores[best]):
+            self.emit("HYSTERESIS_BLOCKED", candidate=best, score=weighted_scores[best])
+            best = "udp:A"  # stay on current path
 
         self.emit("CANDIDATE_SCORES_RAW", scores=raw_scores)
         self.emit("CANDIDATE_SCORES_WEIGHTED", scores=weighted_scores)
