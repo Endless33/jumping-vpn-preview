@@ -37,14 +37,18 @@ class DemoValidator:
         if timestamps != sorted(timestamps):
             self.errors.append("Timestamps are not strictly increasing")
 
+    def check_health(self):
+        for e in self.events:
+            if "health_score" in e:
+                if e["health_score"] < 0 or e["health_score"] > 100:
+                    self.errors.append("Invalid health_score value")
+
     def check_flow_control(self):
         for e in self.events:
-            if "cwnd" in e:
-                if e["cwnd"] <= 0:
-                    self.errors.append("Invalid cwnd value")
-            if "pacing_rate" in e:
-                if e["pacing_rate"] <= 0:
-                    self.errors.append("Invalid pacing_rate value")
+            if "cwnd" in e and e["cwnd"] <= 0:
+                self.errors.append("Invalid cwnd value")
+            if "pacing_rate" in e and e["pacing_rate"] <= 0:
+                self.errors.append("Invalid pacing_rate value")
 
     def check_state_progression(self):
         expected = [
@@ -83,6 +87,7 @@ class DemoValidator:
         self.load()
         self.check_required_events()
         self.check_timestamp_order()
+        self.check_health()
         self.check_flow_control()
         self.check_state_progression()
         self.check_audit()
