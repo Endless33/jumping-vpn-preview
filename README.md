@@ -1,9 +1,9 @@
 # 🧬 Jumping VPN — Architectural Preview
 
-Jumping VPN is a **session‑centric VPN architecture** built for environments where **transport volatility is the norm**, not an exception.
+Jumping VPN is a session‑centric VPN architecture built for environments where transport volatility is the norm, not an exception.
 
 Traditional VPNs bind identity to a single transport.  
-Jumping VPN binds identity to a **persistent session**, while transports remain **replaceable, volatile attachments**.
+Jumping VPN binds identity to a persistent session, while transports remain replaceable, volatile attachments.
 
 This repository contains:
 
@@ -14,7 +14,7 @@ This repository contains:
 - minimal behavioral prototypes  
 - full demo engine (deterministic, observable, reproducible)
 
-It is **not** a production release.
+This is not a production release.
 
 Repository:  
 https://github.com/Endless33/jumping-vpn-preview
@@ -23,17 +23,16 @@ https://github.com/Endless33/jumping-vpn-preview
 
 ## 🎥 Demo Engine (Contract‑First)
 
-Jumping VPN uses a **contract‑first demo model**:  
-behavior is defined before implementation.
+Jumping VPN uses a contract‑first demo model: behavior is defined before implementation.
 
 Demo documents:
 
-- [`DEMO_SPEC.md`](docs/demo/DEMO_SPEC.md)
-- [`DEMO_OUTPUT_FORMAT.md`](docs/demo/DEMO_OUTPUT_FORMAT.md)
-- [`DEMO_SCENARIO.md`](docs/demo/DEMO_SCENARIO.md)
-- [`DEMO_TIMELINE.jsonl`](docs/demo/DEMO_TIMELINE.jsonl)
-- [`STATUS.md`](docs/demo/STATUS.md)
-- [`REVIEW_CHECKLIST.md`](docs/demo/REVIEW_CHECKLIST.md)
+- DEMO_SPEC.md  
+- DEMO_OUTPUT_FORMAT.md  
+- DEMO_SCENARIO.md  
+- DEMO_TIMELINE.jsonl  
+- STATUS.md  
+- REVIEW_CHECKLIST.md  
 
 The demo contract validates:
 
@@ -42,326 +41,243 @@ The demo contract validates:
 - multipath scoring  
 - bounded adaptation  
 - deterministic transport switch  
-- recovery back to `ATTACHED`  
+- recovery back to ATTACHED  
 
-**Session is the anchor.  
-Transport is volatile.**
+Session is the anchor.  
+Transport is volatile.
 
 ---
 
 ## 🚀 Quick Demo Run
 
-The demo engine is fully self‑contained and runs locally.
+Requirements: Python 3.10+
 
-### Requirements
-- Python 3.10+
+Run the demo:
 
-### Run demo
-
-```bash
 python run_demo.py
 
 This generates:
 
-demo_output.jsonl — raw protocol event stream
-
-DEMO_METRICS.json — metrics
-
-DEMO_DASHBOARD.json — compact dashboard
-
-DEMO_ECOSYSTEM/ — full artifact package
-
-DEMO_PACKAGE.zip — zipped lifecycle package
+- demo_output.jsonl  
+- DEMO_METRICS.json  
+- DEMO_DASHBOARD.json  
+- DEMO_ECOSYSTEM/  
+- DEMO_PACKAGE.zip  
 
 The demo is deterministic, observable, reproducible.
 
-🔎 Core Thesis
+---
+
+## 🔎 Core Thesis
 
 Modern networks are inherently unstable:
 
-mobile networks flap
+- mobile networks flap  
+- NAT mappings expire  
+- cross‑border routes degrade  
+- packet loss spikes  
+- paths die unpredictably  
 
-NAT mappings expire
+Most VPNs treat this as failure.  
+Jumping VPN treats it as modeled behavior.
 
-cross‑border routes degrade
+### Separation of Concerns
 
-packet loss spikes
-
-paths die unpredictably
-
-Most VPNs treat this as failure.Jumping VPN treats it as modeled behavior.
-
-Separation of Concerns
-
-Session identity — persistent, cryptographically anchored
-
-Transport binding — volatile, replaceable, auditable
+- Session identity — persistent, cryptographically anchored  
+- Transport binding — volatile, replaceable, auditable  
 
 Transport death ≠ session death (within bounded policy).
 
 ---
 
-🧠 Architectural Model
+## 🧠 Architectural Model
 
-Jumping VPN is defined by behavior over time, not by static configuration.
+Jumping VPN is defined by behavior over time, not static configuration.
 
-Session‑Centric Identity
+### Session‑Centric Identity
 
 The session is the source of truth:
 
-identity belongs to the session
+- identity belongs to the session  
+- transport is an attachment  
+- reattachment preserves continuity  
 
-transport is an attachment
-
-reattachment preserves continuity
-
-Deterministic Recovery
+### Deterministic Recovery
 
 Transport failover is:
 
-explicit
+- explicit  
+- reason‑coded  
+- rate‑limited  
+- policy‑bounded  
+- auditable  
 
-reason‑coded
+No silent renegotiation.  
+No uncontrolled resets.
 
-rate‑limited
-
-policy‑bounded
-
-auditable
-
-No silent renegotiation.No uncontrolled resets.
-
-Volatility as State
+### Volatility as State
 
 Instability is represented explicitly:
 
-BIRTH
-
-ATTACHED
-
-VOLATILE
-
-DEGRADED
-
-REATTACHING
-
-RECOVERING
-
-TERMINATED
+- BIRTH  
+- ATTACHED  
+- VOLATILE  
+- DEGRADED  
+- REATTACHING  
+- RECOVERING  
+- TERMINATED  
 
 Transitions are deterministic and logged.
 
-📂 Repository Structure
+---
 
-.
-├── docs/
-│   ├── index.md
-│   ├── architecture-overview.md
-│   ├── reviewer-guide.md
-│   ├── core/
-│   │   ├── state-machine.md
-│   │   ├── invariants.md
-│   │   ├── reconnect.md
-│   │   ├── reason-codes.md
-│   │   ├── security-boundary.md
-│   │   ├── threat-model.md
-│   │   ├── limitations.md
-│   │   ├── non-goals.md
-│   │   ├── design-decisions.md
-│   │   ├── protocol-rationale.md
-│   │   ├── performance-model.md
-│   │   ├── benchmark-plan.md
-│   │   ├── integration-evaluation.md
-│   │   ├── production-readiness-checklist.md
-│   │   └── production-readiness-gap.md
-│   ├── MutationLogs/
-│   └── demo/
-│       ├── DEMO_SPEC.md
-│       ├── DEMO_OUTPUT_FORMAT.md
-│       ├── DEMO_SCENARIO.md
-│       ├── DEMO_TIMELINE.jsonl
-│       ├── STATUS.md
-│       └── REVIEW_CHECKLIST.md
-│
-├── demo_engine/
-│   ├── engine.py
-│   ├── volatility.py
-│   ├── packets.py
-│   ├── metrics_collector.py
-│   ├── report_generator.py
-│   ├── dashboard_generator.py
-│   ├── mutation_log.py
-│   ├── behavior_signature.py
-│   ├── anomaly_heatmap.py
-│   ├── resilience_index.py
-│   ├── packager.py
-│   ├── zip_packager.py
-│   └── run_*.py (entrypoints)
-│
-├── poc/
-│   ├── demo.py
-│   ├── session.py
-│   ├── transport.py
-│   ├── policy.py
-│   ├── logger.py
-│   ├── realudpprototype.py
-│   └── README_udp.md
-│
-└── core/
-    └── README.md
+## 📂 Repository Structure (Simplified)
 
-🧬 Mutation Logs
+docs/ demo_engine/ poc/ core/ run_demo.py README.md
+
+Full structure is documented inside /docs.
+
+---
+
+## 🧬 Mutation Logs
 
 Mutation Logs document the evolution of:
 
-session lifecycle
-
-volatility modeling
-
-bounded adaptation
-
-reconnect semantics
-
-protocol invariants
+- session lifecycle  
+- volatility modeling  
+- bounded adaptation  
+- reconnect semantics  
+- protocol invariants  
 
 They serve as architectural archaeology.
 
-🌐 Real UDP Prototype (Behavioral Validation)
+---
+
+## 🌐 Real UDP Prototype (Behavioral Validation)
 
 A minimal UDP prototype demonstrates:
 
-session creation
-
-transport death
-
-explicit reattach
-
-proof‑based validation
-
-server‑side TransportSwitch
-
-continuity without identity reset
+- session creation  
+- transport death  
+- explicit reattach  
+- proof‑based validation  
+- server‑side TransportSwitch  
+- continuity without identity reset  
 
 See:
 
-poc/realudpprototype.py
-
-poc/README_udp.md
+- poc/realudpprototype.py  
+- poc/README_udp.md  
 
 This is behavioral validation, not production cryptography.
 
-🛡 Threat Model & Boundaries
+---
+
+## 🛡 Threat Model & Boundaries
 
 Jumping VPN defines:
 
-adversary assumptions
-
-deterministic failure boundaries
-
-allowed transitions
-
-bounded adaptation policies
+- adversary assumptions  
+- deterministic failure boundaries  
+- allowed transitions  
+- bounded adaptation policies  
 
 Recommended reading:
 
-docs/core/threat-model.md
+- docs/core/threat-model.md  
+- docs/core/security-boundary.md  
+- docs/core/invariants.md  
+- docs/core/state-machine.md  
 
-docs/core/security-boundary.md
+---
 
-docs/core/invariants.md
-
-docs/core/state-machine.md
-
-🚫 Explicit Non‑Goals
+## 🚫 Explicit Non‑Goals
 
 Jumping VPN does not aim to provide:
 
-anonymity
-
-censorship bypass
-
-endpoint compromise protection
-
-anti‑forensics
-
-universal VPN replacement
+- anonymity  
+- censorship bypass  
+- endpoint compromise protection  
+- anti‑forensics  
+- universal VPN replacement  
 
 Scope is intentionally narrow:
 
-session continuity under transport volatility
+Session continuity under transport volatility.
 
-🔬 Open Engineering Questions
+---
+
+## 🔬 Open Engineering Questions
 
 Active research areas:
 
-distributed session ownership
-
-clustered state replication
-
-formal verification
-
-QUIC‑based transport experiments
-
-performance under high churn
+- distributed session ownership  
+- clustered state replication  
+- formal verification  
+- QUIC‑based transport experiments  
+- performance under high churn  
 
 Behavioral correctness takes priority.
 
-🎯 Intended Audience
+---
+
+## 🎯 Intended Audience
 
 Relevant for:
 
-mobile infrastructure teams
+- mobile infrastructure teams  
+- fintech platforms with session collapse issues  
+- security architects designing deterministic recovery  
+- operators exploring transport abstraction  
 
-fintech platforms with session collapse issues
+---
 
-security architects designing deterministic recovery
-
-operators exploring transport abstraction
-
-🧭 Philosophy
+## 🧭 Philosophy
 
 Jumping VPN is an architectural thesis:
 
-behavior first
+- behavior first  
+- contracts first  
+- rigor over hype  
 
-contracts first
+Architecture does not require permission.  
+It requires consistency.
 
-rigor over hype
+---
 
-Architecture does not require permission.It requires consistency.
-
-📈 Status
+## 📈 Status
 
 Jumping VPN is in architectural validation.
 
 This repository:
 
-is not production‑ready
+- is not production‑ready  
+- does not include hardened cryptography  
+- exposes staged documentation  
+- focuses on behavioral modeling  
 
-does not include hardened cryptography
+---
 
-exposes staged documentation
-
-focuses on behavioral modeling
-
-🤝 Technical Discussions
+## 🤝 Technical Discussions
 
 Open to discussions on:
 
-deterministic recovery
+- deterministic recovery  
+- bounded adaptation  
+- session persistence  
+- operator‑grade observability  
 
-bounded adaptation
+Email:  
+riabovasvitalijus@gmail.com
 
-session persistence
+---
 
-operator‑grade observability
+## Final Principle
 
-📧 riabovasvitalijus@gmail.com
-
-Final Principle
-
-Transport instability is not an anomaly —it is the default condition of modern networks.
+Transport instability is not an anomaly —  
+it is the default condition of modern networks.
 
 Jumping VPN treats volatility as modeled behavior, not as failure.
 
-Session remains the anchor.Transports come and go.
+Session remains the anchor.  
+Transports come and go.
