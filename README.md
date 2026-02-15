@@ -21,6 +21,27 @@ https://github.com/Endless33/jumping-vpn-preview
 
 ---
 
+## 📚 Documentation
+
+- [Trace Analysis: Deterministic Session Continuity](docs/trace-analysis.md)  
+- [Audience Analysis](docs/audience.md)  
+- [Mutation Log Index](docs/MutationLogIndex.md)
+
+## 🧭 Who’s Watching
+
+Jumping VPN is attracting attention from:
+
+- VPN engineers (OpenVPN, Nord Security)  
+- Cybersecurity professionals (Fortinet, Sonar, JayDevs)  
+- FinTech & Infrastructure (Revolut, LMAX Group, Credo Bank)  
+- Privacy-focused builders (AveryBit)  
+- Government & Healthcare (uHealth, Digital Services)  
+- Zürich, Vilnius, London, Berlin, Singapore, Toronto
+
+📊 [See full audience profile](docs/audience.md)
+
+---
+
 ## 🎥 Demo Engine (Contract‑First)
 
 Jumping VPN uses a contract‑first demo model: behavior is defined before implementation.
