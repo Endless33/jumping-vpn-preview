@@ -312,3 +312,7 @@ Trace validated successfully.
 Session continuity preserved.
 
 This proves that session identity remains stable while transport attachment changes.
+
+## Demo trace
+- Trace: `DEMO_TRACE.jsonl`
+- Open it and read line-by-line (JSONL).
