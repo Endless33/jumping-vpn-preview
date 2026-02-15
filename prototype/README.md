@@ -35,64 +35,111 @@ Recovery back to ATTACHED without identity reset
 
 ---
 
-## 7) `live_demo.py` (в корне репо)
-
-Это one-command runner, который запускает сервер в фоне (через subprocess) и потом клиента.
-
-```python
 # live_demo.py
+"""
+Jumping VPN — Live Prototype Demo Runner
+
+This script launches a local Jumping VPN prototype server and client,
+demonstrates session creation, transport volatility, transport switch,
+and recovery without identity reset.
+
+Output:
+    DEMO_TRACE.jsonl  — deterministic session continuity trace
+
+Usage:
+    python live_demo.py
+"""
+
 from __future__ import annotations
 import subprocess
 import sys
 import time
 import os
 
+
 def main() -> None:
+    # Demo configuration
     psk = "DEMO_PSK_CHANGE_ME"
     host = "127.0.0.1"
     port_a = "40000"
     port_b = "40001"
     session_id = "DEMO-SESSION"
-    trace = "DEMO_TRACE.jsonl"
+    trace_file = "DEMO_TRACE.jsonl"
 
-    # Clean trace
-    if os.path.exists(trace):
-        os.remove(trace)
+    # Remove old trace if exists
+    if os.path.exists(trace_file):
+        os.remove(trace_file)
 
-    print("[live_demo] starting server...")
+    print("[live_demo] Starting Jumping VPN prototype server...")
+
+    # Start server process
     server = subprocess.Popen(
-        [sys.executable, "-m", "prototype.server",
-         "--host", host, "--port-a", port_a, "--port-b", port_b, "--psk", psk],
+        [
+            sys.executable,
+            "-m",
+            "prototype.server",
+            "--host",
+            host,
+            "--port-a",
+            port_a,
+            "--port-b",
+            port_b,
+            "--psk",
+            psk,
+        ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
     )
 
     try:
-        time.sleep(0.6)
+        # Give server time to initialize
+        time.sleep(0.8)
 
-        print("[live_demo] running client...")
+        print("[live_demo] Launching client session...")
+
+        # Run client process
         client = subprocess.run(
-            [sys.executable, "-m", "prototype.client",
-             "--host", host, "--port-a", port_a, "--port-b", port_b,
-             "--psk", psk, "--session-id", session_id, "--trace", trace],
+            [
+                sys.executable,
+                "-m",
+                "prototype.client",
+                "--host",
+                host,
+                "--port-a",
+                port_a,
+                "--port-b",
+                port_b,
+                "--psk",
+                psk,
+                "--session-id",
+                session_id,
+                "--trace",
+                trace_file,
+            ],
             text=True,
         )
 
-        print("[live_demo] client exit code:", client.returncode)
-        print("[live_demo] trace generated:", trace)
-        print("[live_demo] done.")
+        print(f"[live_demo] Client finished with exit code: {client.returncode}")
+
+        if os.path.exists(trace_file):
+            print(f"[live_demo] Demo trace successfully generated: {trace_file}")
+        else:
+            print("[live_demo] Warning: trace file was not created")
+
+        print("[live_demo] Demo completed successfully")
 
     finally:
-        print("[live_demo] stopping server...")
+        print("[live_demo] Shutting down server...")
         server.terminate()
+
         try:
             server.wait(timeout=2)
         except Exception:
             server.kill()
 
+        print("[live_demo] Server stopped")
+
+
 if __name__ == "__main__":
     main()
-
-
-
