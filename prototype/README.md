@@ -1,145 +1,188 @@
-# Prototype: Session-Anchored Transport Demo (UDP)
+Prototype — Jumping VPN Live Session Continuity Demonstration
 
-This is **not a production VPN**.  
-This prototype exists to demonstrate one architectural property:
+This directory contains a minimal live prototype demonstrating the core architectural principle of Jumping VPN:
 
-**Session continuity independent of transport attachment.**
+Session-anchored identity with transport-volatile attachments.
 
-- Session identity is anchored to a session key (`session_id` + PSK)
-- Transport paths (`udp:A`, `udp:B`) are replaceable attachments
-- Monotonic counters provide replay resistance (demo-level)
-- Switching transport does **not** renegotiate identity
+This prototype is not a production VPN.
+It is a behavioral and architectural validation tool.
 
-## Run
-
-Terminal 1 (server):
-
-```bash
-python -m prototype.server --host 127.0.0.1 --port-a 40000 --port-b 40001 --psk DEMO_PSK_CHANGE_ME
-
-Terminal 2 (client):
-
-python -m prototype.client --host 127.0.0.1 --port-a 40000 --port-b 40001 --psk DEMO_PSK_CHANGE_ME --session-id DEMO-SESSION --trace DEMO_TRACE.jsonl
-
-Output trace is JSONL: DEMO_TRACE.jsonl
-
-What it proves
-
-Session created (ATTACHED on udp:A)
-
-Volatility signal (loss spike)
-
-Transport switch udp:A -> udp:B
-
-Recovery back to ATTACHED without identity reset
+It demonstrates that a session can survive transport changes without identity reset or renegotiation.
 
 ---
 
-# live_demo.py
-"""
-Jumping VPN — Live Prototype Demo Runner
+Purpose
 
-This script launches a local Jumping VPN prototype server and client,
-demonstrates session creation, transport volatility, transport switch,
-and recovery without identity reset.
+The prototype proves the following properties:
 
-Output:
-    DEMO_TRACE.jsonl  — deterministic session continuity trace
+• Session identity is independent of transport
+• Transport paths can change dynamically
+• Session continuity is preserved across path switches
+• Deterministic trace can be generated and validated
+• Transport volatility does not break cryptographic continuity model
 
-Usage:
-    python live_demo.py
-"""
+This is the foundation of the Jumping VPN architecture.
 
-from __future__ import annotations
-import subprocess
-import sys
-import time
-import os
+---
 
+Components
 
-def main() -> None:
-    # Demo configuration
-    psk = "DEMO_PSK_CHANGE_ME"
-    host = "127.0.0.1"
-    port_a = "40000"
-    port_b = "40001"
-    session_id = "DEMO-SESSION"
-    trace_file = "DEMO_TRACE.jsonl"
+This directory contains the following modules:
 
-    # Remove old trace if exists
-    if os.path.exists(trace_file):
-        os.remove(trace_file)
+client.py
+Client simulator that attaches to server, generates session traffic, and performs transport switches.
 
-    print("[live_demo] Starting Jumping VPN prototype server...")
+server.py
+Server simulator that accepts transport attachments and maintains session continuity.
 
-    # Start server process
-    server = subprocess.Popen(
-        [
-            sys.executable,
-            "-m",
-            "prototype.server",
-            "--host",
-            host,
-            "--port-a",
-            port_a,
-            "--port-b",
-            port_b,
-            "--psk",
-            psk,
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
+session_manager.py
+Session identity manager. Tracks session state independent of transport.
 
-    try:
-        # Give server time to initialize
-        time.sleep(0.8)
+transport_layer.py
+Transport abstraction layer. Allows transport attachment and detachment without affecting session identity.
 
-        print("[live_demo] Launching client session...")
+---
 
-        # Run client process
-        client = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "prototype.client",
-                "--host",
-                host,
-                "--port-a",
-                port_a,
-                "--port-b",
-                port_b,
-                "--psk",
-                psk,
-                "--session-id",
-                session_id,
-                "--trace",
-                trace_file,
-            ],
-            text=True,
-        )
+Architecture Model
 
-        print(f"[live_demo] Client finished with exit code: {client.returncode}")
+Jumping VPN separates identity from transport.
 
-        if os.path.exists(trace_file):
-            print(f"[live_demo] Demo trace successfully generated: {trace_file}")
-        else:
-            print("[live_demo] Warning: trace file was not created")
+Traditional model:
 
-        print("[live_demo] Demo completed successfully")
+identity → transport → socket → IP
 
-    finally:
-        print("[live_demo] Shutting down server...")
-        server.terminate()
+Jumping VPN model:
 
-        try:
-            server.wait(timeout=2)
-        except Exception:
-            server.kill()
+identity → session anchor → transport attachment → socket → IP
 
-        print("[live_demo] Server stopped")
+Transport becomes replaceable.
 
+Session remains persistent.
 
-if __name__ == "__main__":
-    main()
+---
+
+Behavioral Flow
+
+Typical prototype execution:
+
+1. Session is created
+2. Client attaches via transport A
+3. Traffic flows normally
+4. Transport degradation occurs
+5. Client switches to transport B
+6. Session continues without reset
+7. Continuity is preserved
+
+This behavior is recorded in a deterministic trace file.
+
+---
+
+Running the Prototype
+
+From the repository root directory:
+
+python live_demo.py
+
+This will:
+
+• start the prototype server
+• start the prototype client
+• simulate transport volatility
+• perform transport switch
+• generate a deterministic trace
+
+Output file:
+
+DEMO_TRACE.jsonl
+
+---
+
+Trace Validation
+
+To validate continuity:
+
+python demo_engine/replay.py DEMO_TRACE.jsonl
+
+Expected output:
+
+SESSION_CREATED OK
+VOLATILITY_SIGNAL OK
+TRANSPORT_SWITCH OK
+STATE_CHANGE OK
+RECOVERY_COMPLETE OK
+
+Trace validated successfully.
+Session continuity preserved.
+
+---
+
+What This Prototype Is
+
+This prototype is:
+
+• architectural proof
+• behavioral model
+• deterministic simulation
+• protocol continuity validation tool
+
+---
+
+What This Prototype Is Not
+
+This prototype is not:
+
+• production VPN
+• encrypted tunnel
+• anonymity tool
+• privacy product
+
+It is an architectural validation layer.
+
+Cryptographic integration is part of future phases.
+
+---
+
+Core Principle
+
+Session is the anchor.
+
+Transport is volatile.
+
+Transport can change.
+Identity cannot break.
+
+---
+
+Future Evolution
+
+Next stages include:
+
+• real encrypted transport layer
+• authenticated session anchors
+• key schedule integration
+• replay protection enforcement
+• production transport abstraction
+
+---
+
+Relationship to Jumping VPN
+
+This prototype demonstrates the behavioral core of Jumping VPN.
+
+The full protocol extends this model with:
+
+• cryptographic binding
+• forward-only key schedule
+• authenticated session continuity
+• replay protection
+• adaptive transport selection
+
+---
+
+Final Note
+
+This prototype exists to prove one architectural fact:
+
+Session continuity can survive transport volatility.
+
+This is the foundation of Jumping VPN.
