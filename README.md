@@ -316,3 +316,18 @@ This proves that session identity remains stable while transport attachment chan
 ## Demo trace
 - Trace: `DEMO_TRACE.jsonl`
 - Open it and read line-by-line (JSONL).
+
+---
+
+## 🔒 Easter Egg (for reviewers)
+
+If you found this: yes — the roadmap is real.
+
+`SESSION_ANCHOR > TRANSPORT`
+
+Next milestones:
+- deterministic replay validator
+- live transport adapter prototype
+- protocol hardening & formalization
+
+(If you’re reading this as a CTO/CEO: ping me. I can walk you through the invariants in 5 minutes.)
