@@ -281,3 +281,34 @@ Jumping VPN treats volatility as modeled behavior, not as failure.
 
 Session remains the anchor.  
 Transports come and go.
+
+---
+
+## ✅ Demo Trace Validator
+
+A deterministic demo trace is included to verify session continuity behavior.
+
+Trace file:
+
+DEMO_TRACE.jsonl
+
+Validator script:
+
+demo_engine/replay.py
+
+Run validator from repository root:
+
+python demo_engine/replay.py DEMO_TRACE.jsonl
+
+Expected output:
+
+SESSION_CREATED OK  
+VOLATILITY_SIGNAL OK  
+TRANSPORT_SWITCH OK  
+STATE_CHANGE OK  
+RECOVERY_COMPLETE OK  
+
+Trace validated successfully.  
+Session continuity preserved.
+
+This proves that session identity remains stable while transport attachment changes.
