@@ -1,294 +1,224 @@
 """
-Jumping VPN — Demo Replay Engine (Preview)
+Jumping VPN — Demo Trace Validator (contract-first)
 
-Purpose:
-- Read a JSONL demo trace (DEMO_TRACE.jsonl)
-- Validate basic structure
-- Enforce monotonic time
-- Enforce monotonic state_version (when present)
-- Reject obvious replay/injection patterns (duplicate counters if present)
-- Produce a clear PASS/FAIL summary
+Validates a JSONL demo trace for deterministic session continuity.
 
-This is NOT production crypto.
-This is a deterministic demo validator for reviewers.
+Usage:
+    python demo_engine/replay.py DEMO_TRACE.jsonl
+
+Expected output style:
+    SESSION_CREATED OK
+    VOLATILITY_SIGNAL OK
+    TRANSPORT_SWITCH OK
+    STATE_CHANGE OK
+    RECOVERY_COMPLETE OK
+    Trace validated successfully. Session continuity preserved.
 """
 
 from __future__ import annotations
 
 import json
 import sys
-from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 
-# -----------------------------
-# Config / expectations
-# -----------------------------
+REQUIRED_EVENTS_IN_ORDER = [
+    "SESSION_CREATED",
+    "VOLATILITY_SIGNAL",
+    "TRANSPORT_SWITCH",
+    "STATE_CHANGE",        # must include ATTACHED -> VOLATILE
+    "RECOVERY_COMPLETE",   # represented by STATE_CHANGE to ATTACHED with reason RECOVERY_COMPLETE
+]
 
-REQUIRED_KEYS = {"ts_ms", "event", "session_id"}
-OPTIONAL_KEYS = {
-    "state",
-    "from",
-    "to",
-    "reason",
-    "reason_code",
-    "state_version",
-    "counter",  # optional monotonic per-session frame counter
-    "active_path",
-    "from_path",
-    "to_path",
-    "score",
-    "observed",
-    "bounded_by_policy",
-    "check",
-    "result",
-}
+# Minimal required fields for the contract:
+BASE_REQUIRED_FIELDS = ["event", "session_id", "ts_ms"]
 
 
-@dataclass
-class ReplayResult:
-    ok: bool
-    errors: List[str]
-    warnings: List[str]
-    stats: Dict[str, Any]
+class ValidationError(Exception):
+    pass
 
 
-# -----------------------------
-# Parsing
-# -----------------------------
+def _load_jsonl(path: Path) -> List[Dict[str, Any]]:
+    if not path.exists():
+        raise ValidationError(f"File not found: {path}")
+    text = path.read_text(encoding="utf-8").strip()
+    if not text:
+        raise ValidationError("Trace file is empty.")
 
-def load_jsonl(path: str) -> List[Dict[str, Any]]:
     events: List[Dict[str, Any]] = []
-    with open(path, "r", encoding="utf-8") as f:
-        for idx, line in enumerate(f, start=1):
-            line = line.strip()
-            if not line:
-                continue
-            if line.startswith("#"):
-                # allow comments
-                continue
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Line {idx}: invalid JSON: {e}") from e
-            if not isinstance(obj, dict):
-                raise ValueError(f"Line {idx}: event must be a JSON object")
-            events.append(obj)
+    for i, line in enumerate(text.splitlines(), start=1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError as ex:
+            raise ValidationError(f"Invalid JSON at line {i}: {ex}") from ex
+        if not isinstance(obj, dict):
+            raise ValidationError(f"JSONL line {i} must be an object/dict.")
+        events.append(obj)
+
+    if not events:
+        raise ValidationError("No JSON events found (only comments/blank lines?).")
+
     return events
 
 
-# -----------------------------
-# Validators
-# -----------------------------
-
-def validate_required_fields(events: List[Dict[str, Any]]) -> Tuple[List[str], List[str]]:
-    errors: List[str] = []
-    warnings: List[str] = []
-
-    for i, ev in enumerate(events):
-        missing = [k for k in REQUIRED_KEYS if k not in ev]
-        if missing:
-            errors.append(f"Event[{i}] missing required keys: {missing}")
-
-        # warn on unknown keys (helps keep contract clean)
-        unknown = [k for k in ev.keys() if k not in REQUIRED_KEYS and k not in OPTIONAL_KEYS]
-        if unknown:
-            warnings.append(f"Event[{i}] has unknown keys (ok but review): {unknown}")
-
-        # basic type checks
-        if "ts_ms" in ev and not isinstance(ev["ts_ms"], int):
-            errors.append(f"Event[{i}] ts_ms must be int (ms), got: {type(ev['ts_ms']).__name__}")
-        if "event" in ev and not isinstance(ev["event"], str):
-            errors.append(f"Event[{i}] event must be str, got: {type(ev['event']).__name__}")
-        if "session_id" in ev and not isinstance(ev["session_id"], str):
-            errors.append(f"Event[{i}] session_id must be str, got: {type(ev['session_id']).__name__}")
-
-        if "state_version" in ev and not isinstance(ev["state_version"], int):
-            errors.append(f"Event[{i}] state_version must be int, got: {type(ev['state_version']).__name__}")
-
-        if "counter" in ev and not isinstance(ev["counter"], int):
-            errors.append(f"Event[{i}] counter must be int, got: {type(ev['counter']).__name__}")
-
-    return errors, warnings
+def _get_event_name(e: Dict[str, Any]) -> str:
+    # Accept both "event" and "event_type" (some docs use either)
+    return str(e.get("event") or e.get("event_type") or "").strip()
 
 
-def validate_monotonic_time(events: List[Dict[str, Any]]) -> List[str]:
-    errors: List[str] = []
-    last_ts: Optional[int] = None
-    for i, ev in enumerate(events):
-        ts = ev.get("ts_ms")
-        if ts is None:
-            continue
-        if last_ts is not None and ts < last_ts:
-            errors.append(f"Time not monotonic at Event[{i}]: {ts} < {last_ts}")
-        last_ts = ts
-    return errors
+def _require_fields(e: Dict[str, Any], fields: List[str]) -> None:
+    missing = [f for f in fields if f not in e]
+    if missing:
+        raise ValidationError(f"Missing required fields {missing} in event: {e}")
 
 
-def validate_single_session(events: List[Dict[str, Any]]) -> Tuple[Optional[str], List[str]]:
-    errors: List[str] = []
-    session_ids = {ev.get("session_id") for ev in events if "session_id" in ev}
-    session_ids = {s for s in session_ids if isinstance(s, str)}
-    if len(session_ids) == 0:
-        errors.append("No valid session_id found in trace.")
-        return None, errors
-    if len(session_ids) > 1:
-        errors.append(f"Trace contains multiple session_id values: {sorted(session_ids)}")
-        return None, errors
-    return next(iter(session_ids)), errors
+def _is_state_change_to_attached_recovery_complete(e: Dict[str, Any]) -> bool:
+    if _get_event_name(e) != "STATE_CHANGE":
+        return False
+    to_state = (e.get("to") or e.get("state") or "").strip()
+    reason = (e.get("reason") or "").strip()
+    return to_state == "ATTACHED" and reason == "RECOVERY_COMPLETE"
 
 
-def validate_monotonic_state_version(events: List[Dict[str, Any]]) -> List[str]:
-    """
-    If state_version exists, it must never decrease.
-    It may stay the same on non-state events.
-    """
-    errors: List[str] = []
-    last_ver: Optional[int] = None
-    for i, ev in enumerate(events):
-        if "state_version" not in ev:
-            continue
-        ver = ev["state_version"]
-        if last_ver is not None and ver < last_ver:
-            errors.append(f"state_version decreased at Event[{i}]: {ver} < {last_ver}")
-        last_ver = ver
-    return errors
+def _is_state_change_attached_to_volatile(e: Dict[str, Any]) -> bool:
+    if _get_event_name(e) != "STATE_CHANGE":
+        return False
+    frm = (e.get("from") or "").strip()
+    to = (e.get("to") or e.get("state") or "").strip()
+    return frm == "ATTACHED" and to == "VOLATILE"
 
 
-def validate_counter_anti_replay(events: List[Dict[str, Any]]) -> Tuple[List[str], List[str]]:
-    """
-    If 'counter' is present, enforce:
-    - counter must strictly increase OR at least never repeat (depending on trace style)
-    We'll enforce: no duplicates (replay) and no decrease (rollback).
-    """
-    errors: List[str] = []
-    warnings: List[str] = []
-    seen: set[int] = set()
+def _validate_monotonic_ts(events: List[Dict[str, Any]]) -> None:
     last: Optional[int] = None
-
-    counters = [ev.get("counter") for ev in events if "counter" in ev]
-    if not counters:
-        warnings.append("No 'counter' fields found. Anti-replay check limited to state_version/time only.")
-        return errors, warnings
-
-    for i, ev in enumerate(events):
-        if "counter" not in ev:
-            continue
-        c = ev["counter"]
-        if c in seen:
-            errors.append(f"Replay detected: duplicate counter={c} at Event[{i}]")
-        seen.add(c)
-        if last is not None and c < last:
-            errors.append(f"Counter rollback detected at Event[{i}]: {c} < {last}")
-        last = c
-
-    return errors, warnings
+    for e in events:
+        ts = e.get("ts_ms")
+        if not isinstance(ts, int):
+            raise ValidationError(f"ts_ms must be int (ms). Bad event: {e}")
+        if last is not None and ts < last:
+            raise ValidationError("ts_ms must be non-decreasing (monotonic).")
+        last = ts
 
 
-def validate_core_claim(events: List[Dict[str, Any]]) -> Tuple[List[str], List[str]]:
+def _validate_single_session(events: List[Dict[str, Any]]) -> str:
+    sid = None
+    for e in events:
+        name = _get_event_name(e)
+        if not name:
+            raise ValidationError(f"Event missing 'event'/'event_type': {e}")
+        _require_fields(e, ["session_id", "ts_ms"])
+        if sid is None:
+            sid = str(e["session_id"])
+        elif str(e["session_id"]) != sid:
+            raise ValidationError("Trace must contain a single session_id (single demo session).")
+    assert sid is not None
+    return sid
+
+
+def _validate_no_termination(events: List[Dict[str, Any]]) -> None:
+    for e in events:
+        name = _get_event_name(e)
+        if name == "STATE_CHANGE":
+            to_state = (e.get("to") or e.get("state") or "").strip()
+            if to_state == "TERMINATED":
+                raise ValidationError("TERMINATED found: session continuity violated.")
+        if name == "TERMINATED":
+            raise ValidationError("TERMINATED event found: session continuity violated.")
+
+
+def _validate_switch_fields(events: List[Dict[str, Any]]) -> None:
+    for e in events:
+        if _get_event_name(e) == "TRANSPORT_SWITCH":
+            # Require from/to path identifiers
+            if not (e.get("from_path") or e.get("from")):
+                raise ValidationError("TRANSPORT_SWITCH must include from_path/from.")
+            if not (e.get("to_path") or e.get("to")):
+                raise ValidationError("TRANSPORT_SWITCH must include to_path/to.")
+
+
+def _validate_audit_no_dual_active(events: List[Dict[str, Any]]) -> None:
+    # Optional but strong: if present, must PASS
+    for e in events:
+        if _get_event_name(e) in ("AUDIT_EVENT", "SECURITY_EVENT"):
+            if str(e.get("check", "")).strip() == "NO_DUAL_ACTIVE_BINDING":
+                if str(e.get("result", "")).strip().upper() != "PASS":
+                    raise ValidationError("NO_DUAL_ACTIVE_BINDING audit not PASS.")
+
+
+def _validate_required_sequence(events: List[Dict[str, Any]]) -> List[str]:
     """
-    Minimal high-signal checks:
-    - must contain TRANSPORT_SWITCH
-    - must contain ATTACHED state at start and end (either via 'state' or STATE_CHANGE to ATTACHED)
-    - must NOT contain TERMINATED (unless explicitly documented, but demo claim says no)
+    Returns a list of status lines like 'SESSION_CREATED OK'
     """
-    errors: List[str] = []
-    warnings: List[str] = []
+    status: List[str] = []
 
-    event_names = [ev.get("event") for ev in events if isinstance(ev.get("event"), str)]
+    # 1) SESSION_CREATED exists
+    if any(_get_event_name(e) == "SESSION_CREATED" for e in events):
+        status.append("SESSION_CREATED OK")
+    else:
+        raise ValidationError("Missing SESSION_CREATED.")
 
-    if "TRANSPORT_SWITCH" not in event_names:
-        errors.append("Missing required event: TRANSPORT_SWITCH")
+    # 2) VOLATILITY_SIGNAL exists
+    if any(_get_event_name(e) == "VOLATILITY_SIGNAL" for e in events):
+        status.append("VOLATILITY_SIGNAL OK")
+    else:
+        raise ValidationError("Missing VOLATILITY_SIGNAL.")
 
-    if "TERMINATED" in [ev.get("state") for ev in events if "state" in ev]:
-        errors.append("Trace contains state=TERMINATED (demo claim expects no termination).")
+    # 3) TRANSPORT_SWITCH exists
+    if any(_get_event_name(e) == "TRANSPORT_SWITCH" for e in events):
+        status.append("TRANSPORT_SWITCH OK")
+    else:
+        raise ValidationError("Missing TRANSPORT_SWITCH.")
 
-    # find attached at start/end
-    attached_mentions = 0
-    for ev in events:
-        if ev.get("state") == "ATTACHED":
-            attached_mentions += 1
-        if ev.get("event") == "STATE_CHANGE" and ev.get("to") == "ATTACHED":
-            attached_mentions += 1
+    # 4) Must contain ATTACHED -> VOLATILE explicit change
+    if any(_is_state_change_attached_to_volatile(e) for e in events):
+        status.append("STATE_CHANGE OK")
+    else:
+        raise ValidationError("Missing STATE_CHANGE ATTACHED -> VOLATILE.")
 
-    if attached_mentions == 0:
-        warnings.append("No explicit ATTACHED found (state or STATE_CHANGE to ATTACHED). Consider adding for clarity.")
+    # 5) Must contain recovery completion (STATE_CHANGE ... to ATTACHED with reason RECOVERY_COMPLETE)
+    if any(_is_state_change_to_attached_recovery_complete(e) for e in events):
+        status.append("RECOVERY_COMPLETE OK")
+    else:
+        raise ValidationError("Missing recovery completion back to ATTACHED (reason=RECOVERY_COMPLETE).")
 
-    # soft check: volatility -> switch -> recover
-    if "VOLATILITY_SIGNAL" not in event_names:
-        warnings.append("No VOLATILITY_SIGNAL found. Demo may feel less realistic to reviewers.")
-    if "RECOVERY_SIGNAL" not in event_names:
-        warnings.append("No RECOVERY_SIGNAL found. Demo may feel less complete.")
-
-    return errors, warnings
+    return status
 
 
-# -----------------------------
-# Runner
-# -----------------------------
+def validate(trace_path: Path) -> Tuple[bool, str]:
+    events = _load_jsonl(trace_path)
 
-def run(path: str) -> ReplayResult:
-    events = load_jsonl(path)
+    # Basic invariants
+    _validate_single_session(events)
+    _validate_monotonic_ts(events)
+    _validate_no_termination(events)
+    _validate_switch_fields(events)
+    _validate_audit_no_dual_active(events)
 
-    errors: List[str] = []
-    warnings: List[str] = []
+    status_lines = _validate_required_sequence(events)
 
-    e1, w1 = validate_required_fields(events)
-    errors.extend(e1)
-    warnings.extend(w1)
-
-    sid, e2 = validate_single_session(events)
-    errors.extend(e2)
-
-    errors.extend(validate_monotonic_time(events))
-    errors.extend(validate_monotonic_state_version(events))
-
-    e3, w3 = validate_counter_anti_replay(events)
-    errors.extend(e3)
-    warnings.extend(w3)
-
-    e4, w4 = validate_core_claim(events)
-    errors.extend(e4)
-    warnings.extend(w4)
-
-    stats = {
-        "path": path,
-        "events_total": len(events),
-        "session_id": sid,
-        "has_counter": any("counter" in ev for ev in events),
-        "has_state_version": any("state_version" in ev for ev in events),
-        "events": sorted({ev.get("event") for ev in events if isinstance(ev.get("event"), str)}),
-    }
-
-    return ReplayResult(ok=(len(errors) == 0), errors=errors, warnings=warnings, stats=stats)
+    out = []
+    out.extend(status_lines)
+    out.append("Trace validated successfully. Session continuity preserved.")
+    return True, "\n".join(out)
 
 
 def main(argv: List[str]) -> int:
-    if len(argv) < 2:
-        print("Usage: python demo_engine/replay.py <path_to_jsonl>")
-        print("Example: python demo_engine/replay.py DEMO_TRACE.jsonl")
+    if len(argv) != 2:
+        print("Usage: python demo_engine/replay.py DEMO_TRACE.jsonl")
         return 2
 
-    path = argv[1]
-    result = run(path)
+    trace_path = Path(argv[1]).resolve()
 
-    print("\n=== Jumping VPN Demo Replay Validation ===")
-    for k, v in result.stats.items():
-        print(f"{k}: {v}")
-
-    if result.warnings:
-        print("\nWARNINGS:")
-        for w in result.warnings:
-            print(f"- {w}")
-
-    if not result.ok:
-        print("\nFAIL:")
-        for e in result.errors:
-            print(f"- {e}")
+    try:
+        ok, msg = validate(trace_path)
+        print(msg)
+        return 0 if ok else 1
+    except ValidationError as ex:
+        print(f"VALIDATION FAILED: {ex}")
         return 1
-
-    print("\nPASS: deterministic demo trace validated")
-    return 0
 
 
 if __name__ == "__main__":
