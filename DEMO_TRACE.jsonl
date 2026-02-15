@@ -1,0 +1,8 @@
+{"ts_ms":1700000000000,"event":"SESSION_CREATED","session":"DEMO-SESSION","state":"ATTACHED"}
+{"ts_ms":1700000000500,"event":"PATH_SELECTED","path":"udp:A","rtt":24,"jitter":3,"loss":0.0}
+{"ts_ms":1700000000900,"event":"LOSS_SPIKE","path":"udp:A","loss":7.5}
+{"ts_ms":1700000001000,"event":"STATE_CHANGE","from":"ATTACHED","to":"VOLATILE"}
+{"ts_ms":1700000001200,"event":"TRANSPORT_SWITCH","from":"udp:A","to":"udp:B"}
+{"ts_ms":1700000001300,"event":"AUDIT_EVENT","check":"NO_IDENTITY_RESET","result":"PASS"}
+{"ts_ms":1700000001800,"event":"RECOVERY_SIGNAL"}
+{"ts_ms":1700000002000,"event":"STATE_CHANGE","from":"RECOVERING","to":"ATTACHED"}
