@@ -38,6 +38,14 @@ At `t=12.4s`, the primary transport experiences a 37% packet loss spike.
 
 ---
 
+## 📊 Suggested Next Steps
+
+- Add `trace-visualization.png` to `docs/assets/` (optional)  
+- Link this file from `README.md` or `MutationLogIndex.md`  
+- Consider adding `trace-analysis/` folder for future traces
+
+---
+
 ## 🧬 Conclusion
 
 This trace demonstrates that Jumping VPN:
