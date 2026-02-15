@@ -23,7 +23,6 @@ TRANSPORT_SWITCH OK
 STATE_CHANGE OK
 Trace validated successfully. Session continuity preserved.
 Generated file:
-Копировать код
 
 DEMO_OUTPUT.jsonl
 Location:
