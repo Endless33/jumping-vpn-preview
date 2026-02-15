@@ -1,4 +1,4 @@
-🧬 Jumping VPN — Architectural Preview
+ 🧬 Jumping VPN — Architectural Preview
 
 Jumping VPN is a session‑centric VPN architecture built for environments where transport volatility is the norm, not the exception.
 
