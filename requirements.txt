@@ -1,0 +1,23 @@
+# Jumping VPN Demo Requirements
+# This file ensures deterministic demo execution across environments.
+
+# JSON handling (standard library, listed for clarity)
+# No install needed, included with Python
+
+# CLI parsing (standard library)
+# No install needed
+
+# Time / threading / subprocess (standard library)
+# No install needed
+
+# Optional: pretty console output (safe fallback if missing)
+colorama>=0.4.6
+
+# Optional: structured logging support
+rich>=13.7.0
+
+# Optional: future telemetry / metrics expansion
+typing_extensions>=4.9.0
+
+# Optional: deterministic replay / validation enhancements
+dataclasses-json>=0.6.4
