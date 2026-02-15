@@ -33,7 +33,6 @@ Repository:
 - [Audience Analysis](docs/audience.md)  
 - [Clone Spike: February 2026](docs/clone-spike.md)  
 - [Mutation Log Index](docs/MutationLogIndex.md)  
-- [Acquisition & Integration Pathways](docs/acquisition.md)
 
 ---
 
