@@ -7,218 +7,228 @@ Jumping VPN binds identity to a **persistent session**, while transports remain 
 
 ---
 
-## ⚡ Quickstart (60-second demo)
+## 🚀 Quick Demo Run (1 command)
 
 **Requirements:** Python 3.10+
 
-Run:
-
 ```bash
 python run_demo.py
-Expected output:
+
+Expected output (example):
 
 [Jumping VPN] Starting deterministic demo...
-SESSION_CREATED OK
-TRANSPORT_SWITCH OK
-STATE_CHANGE OK
 Trace validated successfully. Session continuity preserved.
-Generated file:
+Output written: DEMO_OUTPUT.jsonl
 
-DEMO_OUTPUT.jsonl
-Location:
+Outputs:
 
-./DEMO_OUTPUT.jsonl
-This file contains a deterministic session trace showing continuity across transport volatility.
-📦 Repository Contents
-This repository contains:
-📐 Architectural documentation
-🧠 Behavioral models
-📃 Contract-first demo specification
-🧬 Mutation logs
-🧪 Minimal behavioral prototypes
-🎥 Deterministic demo runner
-🔍 Trace validator
-This is not a production release.
-This is a protocol organism under active mutation.
-Repository:
-https://github.com/Endless33/jumping-vpn-preview�
+DEMO_OUTPUT.jsonl (generated trace in repo root)
+
+DEMO_ECOSYSTEM/
+
+DEMO_PACKAGE.zip
 
 ---
 
-📚 Documentation
-docs/identity.md
-docs/trace-analysis.md
-docs/audience.md
-docs/clone-spike.md
-docs/MutationLogIndex.md
+🎥 Demo Trace Validator
+
+Trace file: DEMO_TRACE.jsonl
+
+Validator: demo_engine/replay.py
+
+Run:
+
+python demo_engine/replay.py DEMO_TRACE.jsonl
 
 ---
 
-🎥 Demo Model
-Jumping VPN uses a contract-first demo model.
-Behavior is defined before implementation.
-The demo validates:
-Session identity anchoring
-Deterministic transport switching
-Recovery without renegotiation
-Continuity invariants
-Replay-verifiable behavior
-Session is the anchor.
-Transport is volatile.
+📚 Documentation (clickable)
+
+Session Identity Architecture
+
+Trace Analysis: Deterministic Session Continuity
+
+Audience Analysis
+
+Clone Spike: February 2026
+
+Mutation Log Index
 
 ---
 
-📂 Demo Components
-Core demo files:
+🧭 Who’s Watching
 
-run_demo.py
-DEMO_TRACE.jsonl
-DEMO_OUTPUT.jsonl
-demo_engine/replay.py
-Roles:
-run_demo.py → generates deterministic trace
-DEMO_OUTPUT.jsonl → observable demo output
-replay.py → validates invariants
+Jumping VPN is attracting attention from:
+
+VPN engineers (OpenVPN, Nord Security)
+
+Cybersecurity professionals (Fortinet, Sonar, JayDevs)
+
+FinTech & Infrastructure (Revolut, LMAX Group, Credo Bank)
+
+Privacy-focused builders
+
+Government & Healthcare
+
+Geographic clusters: Zürich, Vilnius, London, Berlin, Singapore, Toronto
+
+📊 See: Audience Analysis
 
 ---
 
-🔎 Core Thesis
+🧠 Core Thesis
+
 Modern networks are inherently unstable:
+
 Mobile networks flap
+
 NAT mappings expire
-Routes degrade
+
+Cross-border routes degrade
+
 Packet loss spikes
+
 Paths die unpredictably
+
 Most VPNs treat this as failure.
+
 Jumping VPN treats it as modeled behavior.
-Transport instability ≠ session failure.
+
+Transport death ≠ session death (within bounded policy).
 
 ---
 
-🧠 Architectural Model
-Jumping VPN separates identity from transport.
-Session identity:
-Persistent
-Cryptographically anchored
-Independent of transport
-Transport:
-Replaceable
-Observable
-Volatile
-Continuity survives transport change.
+🧬 Architectural Model
 
----
+Session-Centric Identity
 
-🔄 Deterministic State Model
-States include:
-BIRTH
-ATTACHED
-VOLATILE
-DEGRADED
-REATTACHING
-RECOVERING
-TERMINATED
-Transitions are:
+Session is the source of truth
+
+Identity belongs to the session
+
+Transport is an attachment
+
+Reattachment preserves continuity
+
+Deterministic Recovery
+
+Transport failover is:
+
 Explicit
-Logged
-Deterministic
+
+Reason-coded
+
+Rate-limited
+
+Policy-bounded
+
 Auditable
+
 No silent renegotiation.
 
+No uncontrolled resets.
+
+Volatility as State
+
+Instability is represented explicitly:
+
+BIRTH
+
+ATTACHED
+
+VOLATILE
+
+DEGRADED
+
+REATTACHING
+
+RECOVERING
+
+TERMINATED
+
+Transitions are deterministic and logged.
+
 ---
 
-📂 Repository Structure
+🌐 Real UDP Prototype (Behavioral Validation)
 
-docs/
-demo_engine/
-prototype/
-core/
-run_demo.py
-README.md
+A minimal UDP prototype demonstrates:
 
----
-
-🌐 Prototype Layer
-Prototype demonstrates:
 Session creation
-Transport switching
-Deterministic continuity
-Observable behavior
-Prototype exists for behavioral validation.
-Not production cryptography.
+
+Transport death
+
+Explicit reattach
+
+Continuity without identity reset
+
+See:
+
+poc/realudpprototype.py
+
+poc/README_udp.md
+
+Behavioral validation, not production cryptography.
 
 ---
 
-🛡 Threat Model Scope
-Jumping VPN focuses on:
-Session continuity under volatility
-Deterministic recovery
-Transport independence
+🛡 Threat Model & Boundaries
 
-Non-goals:
-Anonymity systems
+Recommended reading:
+
+docs/core/threat-model.md
+
+docs/core/security-boundary.md
+
+docs/core/invariants.md
+
+docs/core/state-machine.md
+
+---
+
+🚫 Explicit Non-Goals
+
+Jumping VPN does not aim to provide:
+
+Anonymity
+
+Censorship bypass
+
 Endpoint compromise protection
-Consumer VPN replacement
-Scope is protocol continuity.
+
+Anti-forensics
+
+Universal VPN replacement
+
+Scope is intentionally narrow:
+Session continuity under transport volatility.
 
 ---
 
-🔬 Engineering Direction
-Active development areas:
-Transport abstraction layer
-Deterministic replay verification
-Protocol formalization
-Session invariants enforcement
+🔬 Status
+
+Jumping VPN is in architectural validation.
+
+This repository:
+
+Is not production-ready
+
+Does not include hardened cryptography
+
+Focuses on behavioral modeling
 
 ---
 
-🎯 Intended Audience
-Relevant for:
-Protocol engineers
-VPN architects
-FinTech infrastructure teams
-Network reliability engineers
-Security architects
+🤝 Technical Discussions
 
----
-
-📈 Status
-Jumping VPN is in architectural validation stage.
-This repository provides:
-Reproducible demo
-Deterministic trace
-Protocol model
-Behavioral validation
-
----
-
-🔍 Trace Validator
-Run validator manually:
-Bash
-Копировать код
-python demo_engine/replay.py DEMO_TRACE.jsonl
-Expected:
-SESSION_CREATED OK
-TRANSPORT_SWITCH OK
-STATE_CHANGE OK
-Trace validated successfully. Session continuity preserved.
-
----
-
-🔒 Easter Egg
-Hidden invariant:
-SESSION_ANCHOR > TRANSPORT
-This repository documents the transition from transport-bound identity
-to session-anchored continuity.
-
----
-
-🤝 Contact
-Protocol Architect:
+Email:
 riabovasvitalijus@gmail.com
-Final Principle
-Transport is temporary.
-Session is persistent.
-Jumping VPN enforces this invariant.
 
 ---
+
+Final Principle
+
+Transport instability is not an anomaly — it is the default condition of modern networks.
+
+Session remains the anchor.
+Transports come and go.
