@@ -45,6 +45,8 @@ Jumping VPN is attracting attention from:
 
 📊 [See full audience profile](docs/audience.md)
 
+- [Session Identity Architecture](docs/identity.md)
+
 ---
 
 ## 🎥 Demo Engine (Contract‑First)
