@@ -1,0 +1,8 @@
+{"ts_ms":1700000000000,"event":"SESSION_CREATED","session_id":"DEMO-SESSION","state":"ATTACHED","state_version":0}
+{"ts_ms":1700000000200,"event":"PATH_SELECTED","session_id":"DEMO-SESSION","active_path":"udp:A","score":{"rtt_ms":24,"jitter_ms":3,"loss_pct":0.0},"cwnd_packets":64,"pacing_pps":1200}
+{"ts_ms":1700000000800,"event":"VOLATILITY_SIGNAL","session_id":"DEMO-SESSION","reason":"LOSS_SPIKE","observed":{"loss_pct":7.5,"rtt_ms":41,"jitter_ms":18}}
+{"ts_ms":1700000000810,"event":"STATE_CHANGE","session_id":"DEMO-SESSION","from":"ATTACHED","to":"VOLATILE","reason":"LOSS_SPIKE","state_version":1}
+{"ts_ms":1700000000900,"event":"FLOW_CONTROL_UPDATE","session_id":"DEMO-SESSION","reason":"LOSS_REACTION","cwnd_packets":36,"pacing_pps":820}
+{"ts_ms":1700000001100,"event":"TRANSPORT_SWITCH","session_id":"DEMO-SESSION","from_path":"udp:A","to_path":"udp:B","reason":"PREFERRED_PATH_CHANGED"}
+{"ts_ms":1700000001110,"event":"AUDIT_EVENT","session_id":"DEMO-SESSION","check":"NO_DUAL_ACTIVE_BINDING","result":"PASS"}
+{"ts_ms":1700000001810,"event":"STATE_CHANGE","session_id":"DEMO-SESSION","from":"RECOVERING","to":"ATTACHED","reason":"RECOVERY_COMPLETE","state_version":3}
