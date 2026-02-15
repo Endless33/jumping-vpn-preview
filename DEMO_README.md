@@ -1,15 +1,23 @@
-Jumping VPN Demo Trace
+# Jumping VPN Demo
 
-This file demonstrates session continuity across transport switches.
+This demo demonstrates deterministic session continuity independent of transport attachment.
 
-Key properties shown:
+## Files
 
-- Session identity remains constant
-- Transport may change dynamically
-- No identity reset occurs
-- Continuity is cryptographically preserved
+DEMO_TRACE.jsonl — published demo trace  
+DEMO_OUTPUT.jsonl — deterministic replay output  
+DEMO_TRACE_EXPLANATION.md — explanation of each event  
 
-File:
-DEMO_TRACE.jsonl
+## Key properties demonstrated
 
-This trace simulates volatile transport conditions and validates continuity guarantees.
+• Session identity anchored independently of transport  
+• Transport switch without renegotiation  
+• Deterministic recovery after volatility  
+• No identity reset  
+• Cryptographic continuity preserved  
+
+## How to verify
+
+Trace can be replayed deterministically by DemoEngine.
+
+Session identity remains continuous across transport switches.
