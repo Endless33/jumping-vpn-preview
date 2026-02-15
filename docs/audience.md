@@ -52,7 +52,9 @@ Engagement is concentrated among professionals designing, operating, and securin
 - Healthcare Systems & Digital Health  
   - *Confirmed: uHealth*  
 - Cybersecurity Vendors  
-  - *Confirmed: Fortinet-affiliated professionals*
+  - *Confirmed: Fortinet-affiliated professionals*  
+- Decentralized Identity & Secure Overlay Networks  
+  - *Confirmed: uNetwork*
 
 ---
 
@@ -83,6 +85,21 @@ Engagement is concentrated among professionals designing, operating, and securin
 - Cryptographic lineage  
 - Drift-aware routing  
 - Adversarial memory
+
+---
+
+## 📡 Notable Signals
+
+- Engagement from **Fortinet-affiliated professionals** (2.8%)  
+- Engineers from **OpenVPN**, **Nord Security**, **Tailscale**  
+- **Revolut**: FinTech product engineers  
+- **uHealth**: session analysis and trace interest  
+- **uNetwork**: overlay protocol engineers  
+- **Extreme Networks**: enterprise switching specialists  
+- **LMAX Group**: high-load trading infrastructure  
+- **AveryBit**: privacy-focused software builders  
+- **Credo Bank**: financial infrastructure teams  
+- **Zürich**: geographic concentration of protocol interest
 
 ---
 
