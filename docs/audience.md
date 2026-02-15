@@ -109,6 +109,8 @@ There is strong demand for protocols that treat volatility as a first-class cond
 
 Jumping VPN continues to evolve — with focus on clarity, correctness, and real-world applicability.
 
+---
+
 ## 🧠 Why This Matters
 
 Jumping VPN is not a product. It is a protocol organism — designed for environments where volatility is the norm, not the exception.
