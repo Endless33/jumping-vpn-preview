@@ -38,6 +38,11 @@ Jumping VPN is attracting attention from:
 - Government & Healthcare (uHealth, Digital Services)  
 - Zürich, Vilnius, London, Berlin, Singapore, Toronto
 
+## 📊 Signals
+
+- [Clone Spike: February 2026](docs/clone-spike.md)
+- [Audience Analysis](docs/audience.md)
+
 📊 [See full audience profile](docs/audience.md)
 
 ---
