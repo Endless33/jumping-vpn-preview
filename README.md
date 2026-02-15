@@ -42,7 +42,7 @@ Repository:
 
 Jumping VPN is attracting attention from:
 
-- VPN engineers (OpenVPN, Nord Security)  
+- VPN engineers ([OpenVPN](https://openvpn.net), [Nord Security](https://nordsecurity.com))  
 - Cybersecurity professionals (Fortinet, Sonar, JayDevs)  
 - FinTech & Infrastructure (Revolut, LMAX Group, Credo Bank)  
 - Privacy-focused builders (AveryBit)  
