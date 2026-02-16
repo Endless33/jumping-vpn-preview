@@ -348,7 +348,35 @@ Next milestones:
 
 ---
 
-## Support
+---
 
-Open Collective:
+## Support the Protocol
+
+Jumping VPN is an independent protocol research project.
+
+If you want to support its development and evolution:
+
+Open Collective  
 https://opencollective.com/jumping-vpn-preview
+
+Ko-fi  
+https://ko-fi.com/jumpingvpn
+
+PayPal  
+https://www.paypal.com/paypalme/jumpingvpn
+
+Crypto
+
+BTC  
+bc1qafvdlevfeld4zvmqhvalwqdcc7jag2xanecfwx
+
+ETH  
+0x3b51AaF84F958e082b90639bd7728544234Ff7c9
+
+LTC  
+ltc1qden05pz46cwtk022y9cqhzzfkj2ssgq42ldmys
+
+---
+
+Protocol design is not about hiding instability.  
+It is about surviving it deterministically.
