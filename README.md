@@ -348,3 +348,7 @@ Next milestones:
 
 ---
 
+## Support
+
+Open Collective:
+https://opencollective.com/jumping-vpn-preview
