@@ -348,7 +348,6 @@ Next milestones:
 
 ---
 
----
 
 ## Support the Protocol
 
