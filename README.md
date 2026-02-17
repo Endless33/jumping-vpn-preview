@@ -20,7 +20,7 @@ Open Collective
 https://opencollective.com/jumping-vpn-preview  
 
 PayPal  
-https://www.paypal.com/paypalme/jumpingvpn  
+https://www.paypal.me/JumpingVPN
 
 Crypto  
 
