@@ -1,5 +1,3 @@
----
-
 ## Support the Jumping VPN Protocol
 
 Jumping VPN is a next-generation session-centric VPN protocol designed to survive transport failure without breaking identity continuity.
@@ -34,8 +32,6 @@ ETH
 
 LTC  
 ltc1qden05pz46cwtk022y9cqhzzfkj2ssgq42ldmys  
-
----
 
 Protocol design is not about hiding instability.  
 It is about surviving it deterministically.
