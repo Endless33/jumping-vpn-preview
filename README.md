@@ -1,28 +1,39 @@
-## Support the Protocol
+---
 
-Jumping VPN is an independent protocol research project.
+## Support the Jumping VPN Protocol
 
-If you want to support its development and evolution:
+Jumping VPN is a next-generation session-centric VPN protocol designed to survive transport failure without breaking identity continuity.
 
-Open Collective  
-https://opencollective.com/jumping-vpn-preview
+This is independent protocol research focused on:
+
+• transport-independent session identity  
+• deterministic session recovery  
+• mobility without renegotiation  
+• resilience under unstable networks  
+
+This work is developed independently.
+
+If you want to support its development:
 
 Ko-fi  
-https://ko-fi.com/jumpingvpn
+https://ko-fi.com/jumpingvpn  
+
+Open Collective  
+https://opencollective.com/jumping-vpn-preview  
 
 PayPal  
-https://www.paypal.com/paypalme/jumpingvpn
+https://www.paypal.com/paypalme/jumpingvpn  
 
-Crypto
+Crypto  
 
 BTC  
-bc1qafvdlevfeld4zvmqhvalwqdcc7jag2xanecfwx
+bc1qafvdlevfeld4zvmqhvalwqdcc7jag2xanecfwx  
 
 ETH  
-0x3b51AaF84F958e082b90639bd7728544234Ff7c9
+0x3b51AaF84F958e082b90639bd7728544234Ff7c9  
 
 LTC  
-ltc1qden05pz46cwtk022y9cqhzzfkj2ssgq42ldmys
+ltc1qden05pz46cwtk022y9cqhzzfkj2ssgq42ldmys  
 
 ---
 
