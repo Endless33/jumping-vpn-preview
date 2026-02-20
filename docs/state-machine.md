@@ -1,152 +1,284 @@
-# Jumping VPN — State Machine (Preview)
+# Jumping VPN — Session State Machine
 
-This document defines the **valid session states** and **allowed transitions**.
+This document defines the authoritative session lifecycle for Jumping VPN.
 
-The goal is not to list features.
-The goal is to make **continuity behavior explicit and reviewable**.
+The state machine is:
 
----
+- explicit (no hidden transitions)
+- deterministic (same inputs → same outputs)
+- auditable (every transition is logged)
 
-## 1) States
+Transport volatility is treated as normal input.
 
-### BIRTH
-Session object exists but is not yet attached to a transport.
-
-### ATTACHED
-Session has a validated active transport attachment.
-Normal operation.
-
-### VOLATILE
-The active transport has entered instability:
-loss spike / jitter spike / RTT jump / path degradation.
-
-VOLATILE is not failure — it is a modeled state.
-
-### RECOVERING
-A transport switch has occurred or stability window is being evaluated.
-The session is converging back to normal behavior.
-
-### TERMINATED
-Session is closed.
-No further attachments accepted.
+Session identity persists across transport changes.
 
 ---
 
-## 2) Transition table (canonical)
+# Core Principle
 
-### 2.1 Creation / Attach
+Session identity is anchored above the transport layer.
 
-- `BIRTH → ATTACHED`
-  - reason: `ATTACH_OK`
-  - requires: validated attachment + continuity accepted
+Transport is an attachment.
 
-### 2.2 Volatility detection
+A transport can degrade, disappear, or change.
 
-- `ATTACHED → VOLATILE`
-  - reason: `LOSS_SPIKE` / `JITTER_SPIKE` / `RTT_JUMP` / `PATH_DEGRADED`
-  - requires: volatility signal from telemetry/health logic
-
-### 2.3 Switch / Recovery entry
-
-- `VOLATILE → RECOVERING`
-  - reason: `TRANSPORT_SWITCHED` or `RECOVERY_WINDOW_ENTER`
-  - requires: explicit switch OR entering stability evaluation
-
-### 2.4 Return to stable
-
-- `RECOVERING → ATTACHED`
-  - reason: `RECOVERY_COMPLETE`
-  - requires: stability window passed
-
-### 2.5 Failure termination (explicit only)
-
-- `ATTACHED → TERMINATED`
-- `VOLATILE → TERMINATED`
-- `RECOVERING → TERMINATED`
-  - reason: `TTL_EXPIRED` / `POLICY_FAIL` / `FATAL_ERROR`
+The session persists until explicitly terminated.
 
 ---
 
-## 3) Forbidden transitions
+# State Definitions
 
-These must never occur:
+## BIRTH
+Initial state before the session is created.
 
-- `ATTACHED → BIRTH`
-- `VOLATILE → BIRTH`
-- `RECOVERING → BIRTH`
-- `TERMINATED → *` (no resurrection)
+Entry:
+- no session exists yet
 
-Also forbidden:
-
-- silent transition with no reason
-- transition without `state_version++`
+Exit:
+- SESSION_CREATED
 
 ---
 
-## 4) Event requirements (trace contract)
+## ATTACHED
+Healthy state.
 
-Every state change must emit:
+A single active transport attachment exists.
+Traffic flows normally.
+Continuity is stable.
 
-- `event: "STATE_CHANGE"`
-- `from`, `to`
-- `reason`
-- `state_version` (monotonic)
+Entry conditions:
+- active attachment exists
+- counters are continuous
+- no policy violations
 
-Transport switch must emit:
-
-- `event: "TRANSPORT_SWITCH"`
-- `from_path`, `to_path`
-- `reason`
-
-Volatility detection must emit:
-
-- `event: "VOLATILITY_SIGNAL"`
-- `reason`
-- `observed` metrics (loss/jitter/rtt if available)
+Typical events:
+- TELEMETRY_TICK
+- PATH_SELECTED
+- FLOW_CONTROL_UPDATE
 
 ---
 
-## 5) Minimal demo scenario (required)
+## VOLATILE
+A volatility window is active.
 
-A valid demo must show this chain:
+Transport is still attached, but conditions are unstable.
 
-1) Session created / attached  
-2) Volatility signal occurs  
-3) Enter VOLATILE  
-4) Adaptation + switch  
-5) Enter RECOVERING  
-6) Return to ATTACHED  
+Triggered by:
+- loss spike
+- jitter spike
+- RTT surge
+- health degradation
+- path score collapse
 
-With the key rule:
+Meaning:
+- do not reset identity
+- start bounded adaptation
 
-> session identity remains continuous across the switch.
-
----
-
-## 6) Notes on extensibility
-
-This preview state machine is minimal by design.
-
-Future states may include:
-- `DEGRADED`
-- `REATTACHING`
-- `MIGRATING`
-- `SUSPENDED`
-
-But the invariants remain:
-
-- session identity is stable
-- transport is replaceable
-- recovery is deterministic
-- termination is explicit and final
+Typical actions:
+- reduce cwnd
+- adjust pacing
+- rescore candidates
+- prepare switch
 
 ---
 
-## Summary
+## REATTACHING
+A transport switch is in progress.
 
-Jumping VPN treats transport volatility as a normal condition.
+The protocol is changing attachment without changing session identity.
 
-The state machine exists to make that behavior:
-- deterministic
-- auditable
-- reviewable
+Entry conditions:
+- policy allows switch
+- new candidate is selected
+- cooldown satisfied
+
+Rules:
+- must not create a new session
+- must not reset identity
+- must preserve continuity
+
+Typical events:
+- TRANSPORT_SWITCH
+- AUDIT_EVENT (binding validation)
+
+---
+
+## RECOVERING
+After switch or stabilization, the protocol enters recovery.
+
+Meaning:
+- session is healthy enough to resume growth
+- state returns to ATTACHED only after stability window passes
+
+Typical actions:
+- gradual cwnd growth
+- pacing normalization
+- stability confirmation
+
+---
+
+## TERMINATED
+Final state.
+
+Session is explicitly ended.
+
+Entry reasons:
+- explicit shutdown
+- fatal invariant violation
+- lifetime expiry (policy)
+- unrecoverable error
+
+Rules:
+- identity ends
+- no further events accepted
+
+---
+
+# Allowed Transitions (Authoritative)
+
+BIRTH        -> ATTACHED      (SESSION_CREATED)
+ATTACHED     -> VOLATILE      (VOLATILITY_SIGNAL) ATTACHED     -> TERMINATED    (EXPLICIT_TERMINATION | FATAL)
+VOLATILE     -> REATTACHING   (PREFERRED_PATH_CHANGED | TRANSPORT_FAILED) VOLATILE     -> RECOVERING    (STABILITY_WINDOW_MET) VOLATILE     -> TERMINATED    (FATAL)
+REATTACHING  -> RECOVERING    (SWITCH_COMPLETE) REATTACHING  -> TERMINATED    (FATAL)
+RECOVERING   -> ATTACHED      (RECOVERY_COMPLETE) RECOVERING   -> VOLATILE      (VOLATILITY_SIGNAL) RECOVERING   -> TERMINATED    (FATAL)
+
+No other transitions are valid.
+
+---
+
+# Transition Events (Trace Contract)
+
+Every transition MUST emit at least one of the following:
+
+## SESSION_CREATED
+Creates a new session and enters ATTACHED.
+
+Required fields:
+- session_id
+- state_version
+
+---
+
+## VOLATILITY_SIGNAL
+Signals instability.
+
+Required fields:
+- reason (LOSS_SPIKE / JITTER_SPIKE / RTT_SURGE / HEALTH_DROP)
+- observed metrics (loss, jitter, rtt)
+
+Must transition:
+ATTACHED → VOLATILE
+or
+RECOVERING → VOLATILE
+
+---
+
+## TRANSPORT_SWITCH
+Switches active transport attachment.
+
+Required fields:
+- from_path
+- to_path
+- reason
+
+Must occur only when:
+- in VOLATILE or REATTACHING
+- policy allows switch
+
+---
+
+## STATE_CHANGE
+Explicit state transition record.
+
+Required fields:
+- from
+- to
+- reason
+- state_version
+
+Must appear for every transition.
+
+---
+
+## RECOVERY_COMPLETE
+Signals that recovery ended and ATTACHED is restored.
+
+Required fields:
+- stability window proof (implicit)
+- state_version
+
+Must transition:
+RECOVERING → ATTACHED
+
+---
+
+# Safety Rules
+
+## No Silent State Change
+State may only change via explicit events.
+
+## No Identity Reset
+Switching transport must not recreate session identity.
+
+## Single Active Attachment
+At most one transport is active at any time.
+
+## Deterministic Ordering
+Events must be totally ordered by session counter or timestamp.
+
+---
+
+# Example Timeline
+
+This is the canonical behavioral story:
+
+1) Session begins
+- SESSION_CREATED
+- state: ATTACHED
+
+2) Volatility occurs
+- VOLATILITY_SIGNAL (loss spike)
+- state: VOLATILE
+- cwnd reduces, pacing adjusts
+
+3) Switch happens
+- TRANSPORT_SWITCH (udp:A → udp:B)
+- state: REATTACHING → RECOVERING
+
+4) Recovery completes
+- RECOVERY_COMPLETE
+- state: ATTACHED
+
+No renegotiation.
+No reset.
+
+---
+
+# Validation
+
+A trace is valid if:
+
+- transitions follow the allowed graph
+- invariants remain true
+- switch obeys policy
+- identity remains stable
+- session returns to ATTACHED after recovery
+
+Replay tool validates these conditions:
+
+python demo_engine/replay.py DEMO_TRACE.jsonl
+
+---
+
+# Summary
+
+Jumping VPN defines a deterministic session state machine where:
+
+- volatility is modeled
+- switching is explicit
+- recovery is bounded
+- identity persists
+
+Session is the anchor.
+Transport is replaceable.
+
