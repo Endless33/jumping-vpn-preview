@@ -1,160 +1,203 @@
-# Jumping VPN — Core Invariants (Preview)
+# Jumping VPN — Architectural Invariants
 
-This document defines the **non-negotiable invariants** of the Jumping VPN architecture.
+Architectural invariants define conditions that must remain true at all times.
 
-Invariants are written as **review rules**:
-- if an invariant is violated, the protocol is considered incorrect
-- the demo trace + validator exist to make these invariants observable
+They are the foundation of deterministic protocol behavior.
 
----
-
-## Invariant 0 — Terminology
-
-- **Session Anchor**: the stable identity + continuity state.
-- **Transport Attachment**: a volatile carrier (path/socket) attached to a session.
-- **Continuity**: monotonic progression of session state over time.
+If an invariant is violated, the protocol is considered incorrect.
 
 ---
 
-## Invariant 1 — Session identity is transport-independent
+# Definition
 
-A session must remain valid even if:
-- IP changes
-- NAT mapping rebinding occurs
-- UDP path dies
-- jitter/loss spikes occur
-- the system switches transport
+Invariant:
 
-**Rule:** transport failure must never implicitly reset session identity.
+A condition that must always hold true regardless of transport volatility, path changes, or network instability.
+
+Invariants protect identity continuity.
 
 ---
 
-## Invariant 2 — Explicit state transitions only
+# Invariant 1 — Session Identity Continuity
 
-State must change only via explicit transitions:
+The session identifier must never change during the lifetime of the session.
 
-- transition must include `from`, `to`, and `reason`
-- transition must increase `state_version`
+Formal definition:
 
-**Rule:** no silent transitions.
+∀ t0, t1 ∈ session_lifetime:
+session_id(t0) == session_id(t1)
 
----
+Transport changes must not modify session identity.
 
-## Invariant 3 — Single active attachment
-
-At any time, there is at most **one active transport attachment** for a session.
-
-**Rule:** dual-active attachments are forbidden.
-
-If multiple attachments appear:
-- exactly one can become active
-- others must be rejected or pruned as stale/zombie
+Violation would represent identity discontinuity.
 
 ---
 
-## Invariant 4 — Continuity is monotonic
+# Invariant 2 — Transport Independence of Identity
 
-Continuity must be monotonic over session lifetime.
+Session identity must exist independently of transport attachment.
 
-- every accepted event/frame must progress continuity state
-- rejected events must not mutate session state
+Formal model:
 
-**Rule:** the session must never accept a stale continuity progression.
+identity = session_anchor transport = attachment(identity)
 
----
+Transport removal must not destroy identity.
 
-## Invariant 5 — Replay and injection are rejected before mutation
-
-Architectural model:
-
-- every frame/event is bound to the session identity
-- every frame/event has a monotonic counter
-- receiver validates a bounded window
-
-Reject conditions:
-
-- duplicate counter
-- out-of-window counter
-- invalid binding/authentication
-- invalid session_id binding
-
-**Rule:** rejection happens **before** any state transition or flow-control mutation.
+Transport replacement must not recreate identity.
 
 ---
 
-## Invariant 6 — Transport switch is explicit and auditable
+# Invariant 3 — Single Active Transport Attachment
 
-A transport switch must emit an event:
+At most one active transport attachment may exist at any time.
 
-- `TRANSPORT_SWITCH`
-- `from_path`
-- `to_path`
-- `reason`
+Formal definition:
 
-Switching must be policy-bounded (cooldown/switch-rate).
+active_attachments ≤ 1
 
-**Rule:** no implicit switch.
+This prevents ambiguity and race conditions.
 
----
-
-## Invariant 7 — Volatility is a modeled state
-
-Transport instability must not be treated as "random noise".
-
-When volatility is detected, the session must enter a volatility state:
-
-- `ATTACHED → VOLATILE` (reason-coded)
-- bounded adaptation may occur
-
-**Rule:** volatility is observable in the trace.
+Inactive attachments may exist as candidates.
 
 ---
 
-## Invariant 8 — Deterministic recovery
+# Invariant 4 — Explicit State Transitions Only
 
-Recovery is deterministic and reason-coded:
+All session state transitions must be explicit.
 
-- the system enters a recovery window
-- stability criteria returns the session to `ATTACHED`
-- recovery must not require renegotiation of identity
+No implicit or silent transitions are allowed.
 
-**Rule:** trace replay must reconstruct the same state trajectory.
+Formal definition:
 
----
+state(t+1) ≠ state(t) ⇒ transition_event must exist
 
-## Invariant 9 — Termination is explicit and final
-
-Termination must be explicit:
-
-- `STATE_CHANGE ... → TERMINATED`
-- includes reason
-
-**Rule:** after termination, no new attachments can revive the session
-unless a new session is created with a new identity.
+Every state transition must be observable in trace.
 
 ---
 
-## Invariant 10 — Observability contract
+# Invariant 5 — Deterministic Recovery
 
-The demo/trace must allow a reviewer to confirm:
+Recovery must not recreate identity.
 
-- session was created
-- volatility occurred
-- adaptation/switch occurred
-- recovery completed
-- session remained continuous
+Recovery must restore transport attachment while preserving session identity.
 
-If the trace cannot prove these claims, the demo fails.
+Formal definition:
+
+recovery(session_id) ⇒ session_id unchanged
+
+Recovery is a state transition, not session recreation.
 
 ---
 
-## Summary
+# Invariant 6 — No Silent Identity Reset
 
-Jumping VPN is correct only if:
+Identity reset must only occur via explicit session termination.
 
-- **identity remains anchored to session**
-- transport remains replaceable
-- volatility is modeled
-- recovery is deterministic
-- replay/injection are rejected before mutation
-- transitions are explicit + auditable
+Forbidden behavior:
+
+transport_failure ⇒ new session_id
+
+Correct behavior:
+
+transport_failure ⇒ attachment replacement
+
+---
+
+# Invariant 7 — Observable State Machine
+
+All state transitions must be observable via event emission.
+
+Example events:
+
+- SESSION_CREATED
+- VOLATILITY_SIGNAL
+- TRANSPORT_SWITCH
+- STATE_CHANGE
+- RECOVERY_COMPLETE
+
+Trace must fully represent protocol behavior.
+
+---
+
+# Invariant 8 — Attachment Replaceability
+
+Transport attachment must be replaceable without affecting session identity.
+
+Formal definition:
+
+replace(attachment_A, attachment_B) ⇒ session_id unchanged
+
+This enables transport-independent session continuity.
+
+---
+
+# Invariant 9 — Deterministic Behavior
+
+Given identical input conditions, protocol behavior must be deterministic.
+
+Formal definition:
+
+input(t0) == input(t1) ⇒ output(t0) == output(t1)
+
+This enables replay validation.
+
+---
+
+# Invariant 10 — Session Anchor Persistence
+
+Session anchor must exist independently of attachment lifecycle.
+
+Formal model:
+
+destroy(attachment) ≠ destroy(session_anchor)
+
+Session anchor persists until explicit termination.
+
+---
+
+# Invariant Verification
+
+Invariants can be validated via replay:
+
+python demo_engine/replay.py DEMO_TRACE.jsonl
+
+Validator confirms invariant preservation.
+
+---
+
+# Why Invariants Matter
+
+Without invariants, protocol behavior becomes ambiguous.
+
+Ambiguity creates:
+
+- identity discontinuity
+- recovery failures
+- unpredictable behavior
+
+Invariants enforce deterministic architecture.
+
+---
+
+# Architectural Impact
+
+These invariants enable:
+
+- transport-independent identity
+- deterministic recovery
+- observable protocol behavior
+- replay validation
+
+Transport becomes replaceable.
+
+Identity persists.
+
+---
+
+# Summary
+
+Jumping VPN is defined by invariant-preserving behavior.
+
+The protocol guarantees identity continuity regardless of transport volatility.
+
+This is the foundation of session-anchored transport architecture.
