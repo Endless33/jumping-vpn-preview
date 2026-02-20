@@ -1,3 +1,14 @@
+## 🤝 Protocol Integration / Collaboration
+
+If you're building systems where transport volatility is a problem —  
+and you want to test Jumping VPN's behavioral continuity model —  
+I'm open to early integrations, protocol-level conversations, or joint experiments.
+
+LinkedIn https://lt.linkedin.com/in/vitalijus-riabovas-43b022259)  
+→ [Email] (riabovasvitalijus@gmail.com)
+
+---
+
 ## Support the Jumping VPN Protocol
 
 Jumping VPN is a next-generation session-centric VPN protocol designed to survive transport failure without breaking identity continuity.
