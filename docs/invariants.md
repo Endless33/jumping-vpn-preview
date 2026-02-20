@@ -1,138 +1,160 @@
-# Jumping VPN — Core Invariants
+# Jumping VPN — Core Invariants (Preview)
 
-This document defines the non‑negotiable invariants of the Jumping VPN model.
-These rules must hold across all implementations, demos, and runtime behaviors.
+This document defines the **non-negotiable invariants** of the Jumping VPN architecture.
 
-If an invariant is violated, the system is considered incorrect.
-
----
-
-## 1. Identity Invariants
-
-### 1.1 Session identity is immutable
-- `session_id` never changes after creation.
-- No silent renegotiation.
-- No implicit re-authentication.
-
-### 1.2 No dual-active binding
-At no point may two transports be simultaneously active for the same session.
-
-### 1.3 No identity reset during volatility
-Transport death does not imply session death.
+Invariants are written as **review rules**:
+- if an invariant is violated, the protocol is considered incorrect
+- the demo trace + validator exist to make these invariants observable
 
 ---
 
-## 2. State Machine Invariants
+## Invariant 0 — Terminology
 
-### 2.1 State transitions are explicit
-Every transition must be represented by a `STATE_CHANGE` event.
-
-### 2.2 State transitions are monotonic
-`state_version` increments by exactly +1 on every transition.
-
-### 2.3 Illegal transitions are forbidden
-Examples:
-- `RECOVERING -> VOLATILE`
-- `ATTACHED -> REATTACHING`
-- `TERMINATED -> ATTACHED`
-
-### 2.4 Terminal state is final
-`TERMINATED` cannot transition to any other state.
+- **Session Anchor**: the stable identity + continuity state.
+- **Transport Attachment**: a volatile carrier (path/socket) attached to a session.
+- **Continuity**: monotonic progression of session state over time.
 
 ---
 
-## 3. Transport Invariants
+## Invariant 1 — Session identity is transport-independent
 
-### 3.1 Transport is replaceable
-Transport may be detached, replaced, or reattached without affecting identity.
+A session must remain valid even if:
+- IP changes
+- NAT mapping rebinding occurs
+- UDP path dies
+- jitter/loss spikes occur
+- the system switches transport
 
-### 3.2 Transport switch is explicit
-Every switch must emit:
-- `REATTACH_REQUEST`
-- `REATTACH_PROOF`
+**Rule:** transport failure must never implicitly reset session identity.
+
+---
+
+## Invariant 2 — Explicit state transitions only
+
+State must change only via explicit transitions:
+
+- transition must include `from`, `to`, and `reason`
+- transition must increase `state_version`
+
+**Rule:** no silent transitions.
+
+---
+
+## Invariant 3 — Single active attachment
+
+At any time, there is at most **one active transport attachment** for a session.
+
+**Rule:** dual-active attachments are forbidden.
+
+If multiple attachments appear:
+- exactly one can become active
+- others must be rejected or pruned as stale/zombie
+
+---
+
+## Invariant 4 — Continuity is monotonic
+
+Continuity must be monotonic over session lifetime.
+
+- every accepted event/frame must progress continuity state
+- rejected events must not mutate session state
+
+**Rule:** the session must never accept a stale continuity progression.
+
+---
+
+## Invariant 5 — Replay and injection are rejected before mutation
+
+Architectural model:
+
+- every frame/event is bound to the session identity
+- every frame/event has a monotonic counter
+- receiver validates a bounded window
+
+Reject conditions:
+
+- duplicate counter
+- out-of-window counter
+- invalid binding/authentication
+- invalid session_id binding
+
+**Rule:** rejection happens **before** any state transition or flow-control mutation.
+
+---
+
+## Invariant 6 — Transport switch is explicit and auditable
+
+A transport switch must emit an event:
+
 - `TRANSPORT_SWITCH`
-- audit events
+- `from_path`
+- `to_path`
+- `reason`
 
-### 3.3 No implicit fallback
-Transport cannot silently revert to a previous path.
+Switching must be policy-bounded (cooldown/switch-rate).
 
----
-
-## 4. Multipath Invariants
-
-### 4.1 Candidate scoring is deterministic
-Given the same metrics, the scoring function must produce the same ranking.
-
-### 4.2 Switch requires reason code
-Allowed reasons include:
-- `PREFERRED_PATH_CHANGED`
-- `LOSS_SPIKE`
-- `LATENCY_DEGRADATION`
-- `POLICY_TRIGGER`
-
-### 4.3 No oscillation outside policy bounds
-Transport cannot switch back and forth without explicit policy allowance.
+**Rule:** no implicit switch.
 
 ---
 
-## 5. Telemetry Invariants
+## Invariant 7 — Volatility is a modeled state
 
-### 5.1 Telemetry is periodic
-`TELEMETRY_TICK` must appear at a stable interval.
+Transport instability must not be treated as "random noise".
 
-### 5.2 Metrics must be realistic
-- RTT cannot be negative.
-- Loss cannot exceed 100%.
-- Jitter cannot be negative.
+When volatility is detected, the session must enter a volatility state:
 
-### 5.3 Metrics must reflect state
-- Volatility → degraded metrics.
-- Recovery → improving metrics.
+- `ATTACHED → VOLATILE` (reason-coded)
+- bounded adaptation may occur
+
+**Rule:** volatility is observable in the trace.
 
 ---
 
-## 6. Flow Control Invariants
+## Invariant 8 — Deterministic recovery
 
-### 6.1 cwnd reacts to loss
-Loss spike → cwnd decreases.
+Recovery is deterministic and reason-coded:
 
-### 6.2 pacing reacts to congestion
-Congestion → pacing decreases.
+- the system enters a recovery window
+- stability criteria returns the session to `ATTACHED`
+- recovery must not require renegotiation of identity
 
-### 6.3 recovery restores flow control
-Recovery → cwnd and pacing return toward baseline.
-
----
-
-## 7. Audit Invariants
-
-### 7.1 Every switch must be audited
-Required checks:
-- `NO_IDENTITY_RESET`
-- `NO_DUAL_ACTIVE_BINDING`
-
-### 7.2 Audit must be PASS or FAIL
-No silent audit.
+**Rule:** trace replay must reconstruct the same state trajectory.
 
 ---
 
-## 8. Demo Invariants
+## Invariant 9 — Termination is explicit and final
 
-### 8.1 Demo output must be deterministic
-Same input → same JSONL output.
+Termination must be explicit:
 
-### 8.2 SessionID must remain constant
-Across the entire demo run.
+- `STATE_CHANGE ... → TERMINATED`
+- includes reason
 
-### 8.3 State machine must follow the scenario
-Baseline → Volatility → Degraded → Reattaching → Recovering → Attached.
+**Rule:** after termination, no new attachments can revive the session
+unless a new session is created with a new identity.
+
+---
+
+## Invariant 10 — Observability contract
+
+The demo/trace must allow a reviewer to confirm:
+
+- session was created
+- volatility occurred
+- adaptation/switch occurred
+- recovery completed
+- session remained continuous
+
+If the trace cannot prove these claims, the demo fails.
 
 ---
 
 ## Summary
 
-These invariants define the correctness boundary of Jumping VPN.
-If an invariant is violated, the system is not behaving as designed.
+Jumping VPN is correct only if:
 
-Session is the anchor.  
-Transport is volatile.
+- **identity remains anchored to session**
+- transport remains replaceable
+- volatility is modeled
+- recovery is deterministic
+- replay/injection are rejected before mutation
+- transitions are explicit + auditable
