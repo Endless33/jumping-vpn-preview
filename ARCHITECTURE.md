@@ -1,182 +1,275 @@
-# Jumping VPN — Architecture (Preview)
+# Jumping VPN — Architecture Overview
 
-This document is the **single architectural map** of the Jumping VPN preview repository.
+Jumping VPN is a session-anchored transport architecture designed to preserve identity continuity under transport volatility.
 
-It is written for engineers reviewing:
-- session continuity claims
-- deterministic recovery semantics
-- transport volatility model
-- safety / rejection rules
+Traditional VPNs bind identity to transport.
 
-This is **not** production cryptography.
-This is a **behavior-first protocol architecture**.
+Jumping VPN binds identity to the session.
+
+Transport becomes a replaceable attachment.
 
 ---
 
-## 1) What this system is
+# Core Architectural Principle
 
-Jumping VPN explores a transport architecture where:
+Identity must survive transport failure.
 
-> **Session identity persists above transport attachments.**  
-> Transport is volatile. Session is the anchor.
+Formally:
 
-Traditional VPNs often bind continuity to a single socket/path.
-Jumping VPN binds continuity to a **session anchor**, and treats paths as replaceable carriers.
+identity = session_anchor transport = attachment(session_anchor)
 
----
+Transport is not the source of identity.
 
-## 2) Core architectural invariant
-
-### Path Independence Principle
-
-**Session existence must not depend on path continuity.**
-
-Transport can:
-- degrade
-- switch
-- disappear
-
-The session must:
-- remain valid (within policy/TTL)
-- preserve continuity state
-- accept only verifiable reattachments
-- never silently reset identity
+The session is.
 
 ---
 
-## 3) Entities
+# Structural Separation
 
-### 3.1 Session Anchor (Identity Layer)
+Jumping VPN explicitly separates:
 
-A **Session** owns:
-- stable `session_id`
-- monotonic continuity counter state
-- state machine + versioning
-- policy/TTL
-- replay window
+| Layer | Responsibility |
+|------|----------------|
+| Session Layer | identity continuity, lifecycle |
+| Transport Layer | packet delivery |
+| Adaptation Layer | path selection, switching logic |
+| Audit Layer | invariant enforcement |
 
-The session anchor is the source of truth.
-
-### 3.2 Transport Attachment (Carrier Layer)
-
-A **Transport Attachment** is a temporary binding:
-- UDP path A / UDP path B
-- TCP path (optional)
-- any replaceable path candidate
-
-Attachments are always:
-- validated
-- continuity-checked
-- auditable
-- single-active (no dual-active identity)
-
-Transport is disposable. Session is not.
+This separation prevents transport instability from destroying identity continuity.
 
 ---
 
-## 4) Continuity model (security + correctness)
+# Session Anchor Model
 
-### 4.1 Replay / injection protection (architectural model)
+The session anchor is the root object.
 
-Each frame/event is expected to carry:
-- **session-scoped monotonic counter**
-- authentication binding to session identity (AEAD/MAC in next milestone)
+Properties:
 
-Receiver acceptance rule:
-- counters must progress within a **bounded sliding window**
-- duplicates are rejected
-- stale/out-of-window counters are rejected
-- invalid authentication is rejected **before** any state mutation
+- unique session identifier
+- cryptographic binding (planned production phase)
+- explicit lifecycle state
+- attachment registry
+- deterministic state transitions
 
-### 4.2 Key schedule (next milestone)
-Keys must be:
-- derived from a session root secret
-- advanced forward-only
-- old keys rejected after rotation
-
-Transport switch must not reset identity or key schedule.
-
-### 4.3 Zombie / stale attachment rejection
-If a second attachment appears:
-- it must prove continuity (counter + binding)
-- otherwise it is rejected as stale/zombie
+The session anchor persists independently of transport validity.
 
 ---
 
-## 5) State machine model
+# Transport Attachment Model
 
-Jumping VPN models volatility explicitly.
+Transport is an attachment object.
 
-Common states in this preview repo:
+Attachment properties:
 
-- `BIRTH`
-- `ATTACHED`
-- `VOLATILE`
-- `RECOVERING`
-- `TERMINATED`
+- path identity (udp:A, udp:B, etc.)
+- telemetry metrics (RTT, jitter, loss)
+- health score
+- attachment state
+- attach timestamp
 
-State transitions must be:
+Attachment can be:
+
+- created
+- degraded
+- replaced
+- removed
+
+without terminating the session.
+
+---
+
+# State Machine
+
+Session lifecycle follows explicit deterministic states:
+
+BIRTH ↓ ATTACHED ↓ VOLATILE ↓ REATTACHING ↓ RECOVERING ↓ ATTACHED ↓ TERMINATED
+
+State transitions are:
+
 - explicit
 - reason-coded
-- monotonic-versioned
-- logged (auditable)
+- auditable
+- deterministic
 
-No silent downgrade.
-No identity reset without TERMINATE.
-
----
-
-## 6) Deterministic recovery semantics
-
-When the current transport becomes unhealthy:
-
-1) system emits a volatility signal
-2) enters a volatility state (`VOLATILE`)
-3) applies bounded adaptation (cwnd/pacing changes)
-4) selects a better path candidate
-5) performs explicit transport switch
-6) enters recovery window
-7) returns to `ATTACHED` if stability criteria is met
-
-The output is a deterministic trace that reviewers can replay.
+No implicit renegotiation is allowed.
 
 ---
 
-## 7) What “done” means in the preview repo
+# Transport Volatility Model
 
-This repository is considered successful if it provides:
+Transport is assumed unstable by default.
 
-- a clear architecture contract (this document)
-- a deterministic trace format
-- a validator/replay engine
-- a scenario showing:
-  loss spike → adaptation → transport switch → recovery → still ATTACHED
+Instability includes:
 
-It does **not** claim:
-- production crypto
-- TUN integration
-- production hardening
-- censorship bypass / anonymity
+- packet loss spikes
+- RTT spikes
+- jitter spikes
+- NAT rebinding
+- path disappearance
 
----
+Volatility is modeled as a normal state, not an exception.
 
-## 8) Where to look in this repo
-
-Start points (typical):
-
-- `README.md` — entry point
-- `ARCHITECTURE.md` — this map
-- `DEMO_TRACE.jsonl` — example trace
-- `demo_engine/replay.py` — validator
-- `docs/` — invariants, state machine, demo package
+Transport volatility does not terminate the session.
 
 ---
 
-## 9) Final principle
+# Transport Switch Mechanism
 
-Transport instability is normal.
+Switching is explicit.
 
-Jumping VPN is built around the idea that:
+Steps:
 
-> **Volatility is a state. Not a failure.**  
-> **Session is the anchor. Transport is volatile.**
+1. Volatility signal detected
+2. Alternative path evaluated
+3. Switch executed
+4. Recovery state entered
+5. Session returns to ATTACHED
+
+Identity remains unchanged.
+
+---
+
+# Deterministic Recovery
+
+Recovery is deterministic.
+
+Recovery properties:
+
+- no identity reset
+- no renegotiation required
+- no session recreation
+- no hidden implicit state
+
+Recovery is modeled as a state transition.
+
+---
+
+# Invariants
+
+Jumping VPN enforces architectural invariants.
+
+Critical invariants include:
+
+### Identity Continuity Invariant
+
+Session identity must never change during transport replacement.
+
+session_id(t0) == session_id(t1)
+
+---
+
+### Single Active Attachment Invariant
+
+At most one active transport attachment exists at any time.
+
+Prevents ambiguity and race conditions.
+
+---
+
+### No Silent Identity Reset Invariant
+
+Identity reset must be explicit termination + recreation.
+
+Implicit reset is forbidden.
+
+---
+
+### Deterministic State Transition Invariant
+
+All state transitions must be explicit and logged.
+
+---
+
+# Observability Model
+
+Jumping VPN is fully observable.
+
+All events are emitted to trace.
+
+Example events:
+
+- SESSION_CREATED
+- VOLATILITY_SIGNAL
+- TRANSPORT_SWITCH
+- STATE_CHANGE
+- RECOVERY_COMPLETE
+
+Trace format:
+
+JSONL (line-delimited JSON)
+
+Trace can be replayed and validated deterministically.
+
+---
+
+# Failure Model
+
+Traditional VPN failure model:
+
+transport failure → session failure
+
+Jumping VPN failure model:
+
+transport failure → attachment replacement → session persists
+
+This removes path continuity as a structural dependency.
+
+---
+
+# Demo Trace Proof
+
+Public demo trace:
+
+DEMO_TRACE.jsonl
+
+Validator:
+
+python demo_engine/replay.py DEMO_TRACE.jsonl
+
+This proves:
+
+- session continuity
+- explicit volatility detection
+- deterministic transport switch
+- recovery without identity reset
+
+---
+
+# Architectural Implications
+
+This architecture enables:
+
+- mobility across unstable networks
+- deterministic recovery
+- auditable transport switching
+- transport abstraction layer
+
+Identity becomes transport-independent.
+
+---
+
+# Production Path (Future)
+
+Production implementation layers:
+
+1. Cryptographic session anchor binding
+2. UDP / QUIC transport adapters
+3. TUN interface integration
+4. Multipath attachment pool
+5. Production state persistence
+
+Preview repository focuses on architecture and behavioral correctness.
+
+---
+
+# Architectural Summary
+
+Jumping VPN transforms transport from identity anchor into replaceable attachment.
+
+Identity persists.
+
+Transport adapts.
+
+This removes transport continuity as a requirement for session continuity.
+
+This is the foundation of transport-independent session architecture.
