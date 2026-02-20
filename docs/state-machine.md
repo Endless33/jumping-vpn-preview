@@ -1,244 +1,152 @@
-# Jumping VPN — State Machine (Public Preview)
+# Jumping VPN — State Machine (Preview)
 
-This document describes the session lifecycle state machine
-and its allowed transitions.
+This document defines the **valid session states** and **allowed transitions**.
 
-It is intentionally protocol-level (behavioral),
-not an implementation dump.
-
----
-
-## 1. States
-
-The session is the primary object.
-Transports are bindings that can change over time.
-
-### Session States
-
-- **BIRTH**
-  - Session created with identity and policy context.
-  - No transport is required at this stage.
-
-- **ATTACHED**
-  - At least one working transport is bound to the session.
-  - Data flow is possible.
-
-- **VOLATILE**
-  - Instability detected (loss spike, jitter, intermittent drops).
-  - Continuity preserved, but transport quality is degraded.
-
-- **DEGRADED**
-  - Partial failure persists beyond thresholds.
-  - Session remains alive under controlled constraints.
-
-- **RECOVERING**
-  - The system is actively binding a new transport to the existing session.
-  - Reattachment is policy-bounded and auditable.
-
-- **TERMINATED**
-  - Session ended (lifetime exceeded or unrecoverable failure).
-  - A new session requires a full initialization cycle.
+The goal is not to list features.
+The goal is to make **continuity behavior explicit and reviewable**.
 
 ---
 
-## 2. High-Level Diagram
+## 1) States
 
-[BIRTH] | v [ATTACHED] <--------------------+ |                            | | instability detected        | v                            | [VOLATILE]                      | | prolonged instability       | v                            | [DEGRADED]                      | | reattach attempt            | v                            | [RECOVERING] --------------------+ | | no viable transports / policy exhausted / lifetime exceeded v [TERMINATED]
+### BIRTH
+Session object exists but is not yet attached to a transport.
 
----
+### ATTACHED
+Session has a validated active transport attachment.
+Normal operation.
 
-## 3. Allowed Transitions
+### VOLATILE
+The active transport has entered instability:
+loss spike / jitter spike / RTT jump / path degradation.
 
-### BIRTH → ATTACHED
-Trigger:
-- Initial transport successfully attached.
+VOLATILE is not failure — it is a modeled state.
 
-Required:
-- Session identity exists.
-- Policy context available.
+### RECOVERING
+A transport switch has occurred or stability window is being evaluated.
+The session is converging back to normal behavior.
 
----
-
-### ATTACHED → VOLATILE
-Trigger:
-- Packet loss threshold exceeded
-- Latency/jitter threshold exceeded
-- Transport dead detected
-
-Required:
-- Explicit reason code
-- Event emission
+### TERMINATED
+Session is closed.
+No further attachments accepted.
 
 ---
 
-### VOLATILE → RECOVERING
-Trigger:
-- Policy decides to switch transport
-- Active transport dies
-- Volatility persists beyond threshold
+## 2) Transition table (canonical)
 
-Required:
-- Switch must be explicit and auditable
-- Switch rate must be within bounds
+### 2.1 Creation / Attach
 
----
+- `BIRTH → ATTACHED`
+  - reason: `ATTACH_OK`
+  - requires: validated attachment + continuity accepted
 
-### VOLATILE → ATTACHED
-Trigger:
-- Transport stabilizes within recovery window
+### 2.2 Volatility detection
 
-Required:
-- Stability observed for a bounded period
-- Event emission
+- `ATTACHED → VOLATILE`
+  - reason: `LOSS_SPIKE` / `JITTER_SPIKE` / `RTT_JUMP` / `PATH_DEGRADED`
+  - requires: volatility signal from telemetry/health logic
 
----
+### 2.3 Switch / Recovery entry
 
-### VOLATILE → DEGRADED
-Trigger:
-- Instability persists beyond degrade threshold
+- `VOLATILE → RECOVERING`
+  - reason: `TRANSPORT_SWITCHED` or `RECOVERY_WINDOW_ENTER`
+  - requires: explicit switch OR entering stability evaluation
 
-Required:
-- Degraded mode constraints applied
-- Event emission
+### 2.4 Return to stable
 
----
+- `RECOVERING → ATTACHED`
+  - reason: `RECOVERY_COMPLETE`
+  - requires: stability window passed
 
-### DEGRADED → RECOVERING
-Trigger:
-- Candidate transport is available
-- Policy authorizes reattach attempt
+### 2.5 Failure termination (explicit only)
 
-Required:
-- Rate limits and dampening apply
+- `ATTACHED → TERMINATED`
+- `VOLATILE → TERMINATED`
+- `RECOVERING → TERMINATED`
+  - reason: `TTL_EXPIRED` / `POLICY_FAIL` / `FATAL_ERROR`
 
 ---
 
-### RECOVERING → ATTACHED
-Trigger:
-- Reattachment succeeds
-- Transport binding validated
+## 3) Forbidden transitions
 
-Required:
-- Emit `TransportSwitch` and `SessionStateChange`
-- Reset volatility counters under bounded logic
+These must never occur:
 
----
+- `ATTACHED → BIRTH`
+- `VOLATILE → BIRTH`
+- `RECOVERING → BIRTH`
+- `TERMINATED → *` (no resurrection)
 
-### RECOVERING → DEGRADED
-Trigger:
-- Reattachment fails but session is still within grace window
+Also forbidden:
 
-Required:
-- Log failure reason
-- Apply cooldown / dampening if needed
+- silent transition with no reason
+- transition without `state_version++`
 
 ---
 
-### * → TERMINATED
-Triggers (examples):
-- No viable transports for duration > inactivity timeout
-- Session lifetime exceeded
-- Policy exhaustion / unrecoverable security failure
+## 4) Event requirements (trace contract)
 
-Required:
-- Termination must be explicit
-- Deterministic reason code
-- No silent state disappearance
+Every state change must emit:
 
----
+- `event: "STATE_CHANGE"`
+- `from`, `to`
+- `reason`
+- `state_version` (monotonic)
 
-## 4. Forbidden Transitions (Safety)
+Transport switch must emit:
 
-The following are forbidden by design:
+- `event: "TRANSPORT_SWITCH"`
+- `from_path`, `to_path`
+- `reason`
 
-- **BIRTH → VOLATILE**
-  - Volatility assumes at least one transport exists.
+Volatility detection must emit:
 
-- **BIRTH → DEGRADED**
-  - Degradation is a transport-quality concept.
-
-- **TERMINATED → any state**
-  - Terminated is final; a new session must be created.
-
-- **ATTACHED → TERMINATED (without bounded failure condition)**
-  - Termination must be justified by explicit, bounded rules.
+- `event: "VOLATILITY_SIGNAL"`
+- `reason`
+- `observed` metrics (loss/jitter/rtt if available)
 
 ---
 
-## 5. Core Invariants
+## 5) Minimal demo scenario (required)
 
-### I1 — Transport death ≠ Session death
-Loss of a transport must not automatically terminate the session
-if a candidate transport exists within policy constraints.
+A valid demo must show this chain:
 
-### I2 — Adaptation must be bounded
-Switching is limited by:
-- rate limits
-- cooldowns
-- stability scoring
-- policy constraints
+1) Session created / attached  
+2) Volatility signal occurs  
+3) Enter VOLATILE  
+4) Adaptation + switch  
+5) Enter RECOVERING  
+6) Return to ATTACHED  
 
-Unbounded switching is treated as failure.
+With the key rule:
 
-### I3 — Reattachment must be auditable
-Every switch attempt produces:
-- timestamp
-- reason code
-- from/to transport identifiers
-- outcome
-
-### I4 — Failure boundaries are deterministic
-If recovery cannot occur within bounded constraints,
-the session terminates cleanly with explicit reason.
-
-### I5 — No silent renegotiation
-"Hidden" re-authentication or implicit identity reset is forbidden.
-State transitions must explain behavior.
+> session identity remains continuous across the switch.
 
 ---
 
-## 6. Reason Codes (Suggested)
+## 6) Notes on extensibility
 
-Non-exhaustive reason code set:
+This preview state machine is minimal by design.
 
-- `loss_threshold_exceeded`
-- `latency_threshold_exceeded`
-- `transport_dead`
-- `switch_rate_limited`
-- `no_candidate_transports`
-- `session_lifetime_exceeded`
-- `inactivity_timeout`
-- `reattach_validation_failed`
+Future states may include:
+- `DEGRADED`
+- `REATTACHING`
+- `MIGRATING`
+- `SUSPENDED`
 
-Reason codes must be stable and machine-readable.
+But the invariants remain:
 
----
-
-## 7. Observability Events (Suggested)
-
-Events emitted by the state machine:
-
-- `SessionStateChange`
-- `TransportAttached`
-- `TransportSwitch`
-- `TransportSwitchDenied`
-- `TransportSwitchFailed`
-- `DegradedModeEntered`
-- `SessionTerminated`
-
-Events must include:
-- session_id
-- previous_state
-- new_state
-- reason_code
-- timestamp
+- session identity is stable
+- transport is replaceable
+- recovery is deterministic
+- termination is explicit and final
 
 ---
 
 ## Summary
 
-Jumping VPN treats volatility as a modeled state machine,
-with bounded adaptation and deterministic failure boundaries.
+Jumping VPN treats transport volatility as a normal condition.
 
-The session remains the anchor.
-Transports come and go.
+The state machine exists to make that behavior:
+- deterministic
+- auditable
+- reviewable
